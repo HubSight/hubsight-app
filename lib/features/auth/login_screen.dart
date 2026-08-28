@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/biometric_service.dart';
+import '../../core/storage/storage_service.dart';
 import '../camera/playback_screen.dart';
 import '../config/server_config_screen.dart';
 
@@ -18,6 +20,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkQuickBiometricLogin();
+    });
+  }
+
+  Future<void> _checkQuickBiometricLogin() async {
+    final bio = ref.read(biometricServiceProvider);
+    final storage = ref.read(storageServiceProvider);
+    if (bio.isBiometricEnabled && storage.hasAuthToken()) {
+      final success = await bio.authenticate(
+        localizedReason: 'Đăng nhập nhanh bằng sinh trắc học vào HubSight CCTV',
+      );
+      if (success && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+        );
+      }
+    }
+  }
 
   Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
@@ -248,44 +273,78 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     const SizedBox(height: 24),
                     
-                    // Login Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE85D10),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    l10n.loginButton,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                    // Login Button Row
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final bio = ref.watch(biometricServiceProvider);
+                        final storage = ref.watch(storageServiceProvider);
+                        final showBio = bio.isBiometricEnabled && storage.hasAuthToken();
+
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFE85D10),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
+                                    elevation: 0,
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward, size: 20),
-                                ],
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              l10n.loginButton,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Icon(Icons.arrow_forward, size: 20),
+                                          ],
+                                        ),
+                                ),
                               ),
-                      ),
+                            ),
+                            if (showBio) ...[
+                              const SizedBox(width: 12),
+                              InkWell(
+                                onTap: _checkQuickBiometricLogin,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF7ED),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFFFFEDD5)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.fingerprint_rounded,
+                                    color: Color(0xFFE85D10),
+                                    size: 28,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                     
                     const Spacer(),

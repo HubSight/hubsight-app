@@ -4,7 +4,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/auth_models.dart';
 import '../../core/network/api_client.dart';
+import '../../core/services/biometric_service.dart';
 import '../../core/storage/storage_service.dart';
+import '../auth/app_lock_screen.dart';
 import '../config/server_config_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -37,6 +39,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   
   // Timeout: 'immediate' | '1min' | '5mins'
   String _selectedTimeout = 'immediate';
+
+  @override
+  void initState() {
+    super.initState();
+    final bio = ref.read(biometricServiceProvider);
+    _lockOnBackground = bio.isAppLockEnabled;
+    _biometricUnlock = bio.isBiometricEnabled;
+    final mins = bio.lockTimeoutMinutes;
+    if (mins == 1) {
+      _selectedTimeout = '1min';
+    } else if (mins >= 5) {
+      _selectedTimeout = '5mins';
+    } else {
+      _selectedTimeout = 'immediate';
+    }
+  }
 
   void _syncPushPreferences() {
     ref.read(apiClientProvider).updatePreferences(
@@ -399,38 +417,105 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.lockOnBackground,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.lockOnBackground,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              l10n.lockOnBackgroundDesc,
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF64748B),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          l10n.lockOnBackgroundDesc,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
-                            height: 1.35,
+                      ),
+                      const SizedBox(width: 12),
+                      CupertinoSwitch(
+                        activeColor: const Color(0xFFE85D10),
+                        value: _lockOnBackground,
+                        onChanged: (val) async {
+                          final bio = ref.read(biometricServiceProvider);
+                          if (val) {
+                            if (!bio.hasPin) {
+                              // Set new PIN
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => AppLockScreen(
+                                    isCreatingPin: true,
+                                    onUnlocked: () {
+                                      Navigator.pop(context);
+                                      setState(() => _lockOnBackground = true);
+                                    },
+                                  ),
+                                ),
+                              );
+                            } else {
+                              await bio.setAppLockEnabled(true);
+                              setState(() => _lockOnBackground = true);
+                            }
+                          } else {
+                            await bio.setAppLockEnabled(false);
+                            setState(() => _lockOnBackground = false);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  if (_lockOnBackground) ...[
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AppLockScreen(
+                              isCreatingPin: true,
+                              onUnlocked: () {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Đã cập nhật mã PIN mới')),
+                                );
+                              },
+                            ),
                           ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: const [
+                            Text(
+                              'Đổi mã PIN mở khóa',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFE85D10),
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFE85D10)),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  CupertinoSwitch(
-                    activeColor: const Color(0xFFE85D10),
-                    value: _lockOnBackground,
-                    onChanged: (val) => setState(() => _lockOnBackground = val),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -487,7 +572,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: CupertinoSwitch(
                       activeColor: const Color(0xFFE85D10),
                       value: _biometricUnlock,
-                      onChanged: (val) => setState(() => _biometricUnlock = val),
+                      onChanged: (val) async {
+                        final bio = ref.read(biometricServiceProvider);
+                        if (val) {
+                          final canAuth = await bio.canCheckBiometrics();
+                          if (!canAuth) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Thiết bị không hỗ trợ sinh trắc học')),
+                              );
+                            }
+                            return;
+                          }
+                          final success = await bio.authenticate(
+                            localizedReason: 'Xác thực để kích hoạt khóa sinh trắc học',
+                          );
+                          if (success) {
+                            await bio.setBiometricEnabled(true);
+                            setState(() => _biometricUnlock = true);
+                          }
+                        } else {
+                          await bio.setBiometricEnabled(false);
+                          setState(() => _biometricUnlock = false);
+                        }
+                      },
                     ),
                   ),
                 ],
@@ -544,6 +652,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           key: 'immediate',
                           label: l10n.timeoutImmediately,
                           isSelected: _selectedTimeout == 'immediate',
+                          onTap: () {
+                            setState(() => _selectedTimeout = 'immediate');
+                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(0);
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -552,6 +664,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           key: '1min',
                           label: l10n.timeout1Min,
                           isSelected: _selectedTimeout == '1min',
+                          onTap: () {
+                            setState(() => _selectedTimeout = '1min');
+                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(1);
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -560,6 +676,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           key: '5mins',
                           label: l10n.timeout5Mins,
                           isSelected: _selectedTimeout == '5mins',
+                          onTap: () {
+                            setState(() => _selectedTimeout = '5mins');
+                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(5);
+                          },
                         ),
                       ),
                     ],
@@ -693,9 +813,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required String key,
     required String label,
     required bool isSelected,
+    VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: () => setState(() => _selectedTimeout = key),
+      onTap: onTap ?? () => setState(() => _selectedTimeout = key),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 11),
