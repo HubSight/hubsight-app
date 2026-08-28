@@ -127,6 +127,17 @@ You will be prompted to enter and test this URL on the first application launch,
 
 ---
 
+## Firebase Cloud Messaging (FCM) Configuration
+
+The application is pre-integrated with `firebase_core` and `firebase_messaging` via [`FcmService`](lib/core/services/fcm_service.dart). It runs resiliently if Firebase credentials are not yet added.
+
+When you are ready to connect Firebase:
+1. **Android**: Place `google-services.json` inside `android/app/`.
+2. **iOS**: Place `GoogleService-Info.plist` inside `ios/Runner/`.
+3. The app will automatically request notification permissions, obtain the device FCM registration token, and register it with the HubSight backend via `POST /api/notifications/subscribe-push`.
+
+---
+
 ## License & Credits
 
 - **Author**: Anh Quoc Tran
