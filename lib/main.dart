@@ -4,9 +4,12 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/in_app_notification_service.dart';
 import 'core/storage/storage_service.dart';
 import 'features/auth/login_screen.dart';
 import 'features/config/server_config_screen.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,8 +38,9 @@ class _HubSightAppState extends ConsumerState<HubSightApp> {
   @override
   void initState() {
     super.initState();
-    // Initialize FCM Push Notifications (resilient if config added later)
+    // Initialize in-app notification manager & FCM push notifications
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(inAppNotificationServiceProvider).attachNavigatorKey(rootNavigatorKey);
       ref.read(fcmServiceProvider).initialize();
     });
   }
@@ -47,6 +51,7 @@ class _HubSightAppState extends ConsumerState<HubSightApp> {
     final hasServer = storage.hasServerUrl();
 
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'HubSight CCTV',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE85D10)),

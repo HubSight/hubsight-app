@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/socket_service.dart';
 import 'models/notification_model.dart';
+import '../camera/playback_screen.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
@@ -32,6 +33,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       if (!mounted) return;
       final newNotif = NotificationItem.fromJson(data);
       setState(() {
+        _notifications.removeWhere((n) => n.id == newNotif.id);
         _notifications.insert(0, newNotif);
         _unreadCount++;
       });
@@ -49,7 +51,6 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           _isLoading = false;
         });
 
-        // Demo sample notifications if backend is empty to showcase the exact design
         if (_notifications.isEmpty) {
           _loadSampleNotifications();
         }
@@ -69,68 +70,51 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         NotificationItem(
           id: 'n1',
           type: 'push',
-          title: 'Test Push Notification',
-          body: 'This is a test notification triggered from the UI. lúc 14:41:41',
+          title: 'Thông báo hệ thống',
+          body: 'Hệ thống NVR đang hoạt động ổn định. Đã ghi lại 24 bản ghi.',
           category: 'system',
           isRead: true,
-          createdAt: now.subtract(const Duration(hours: 2)).toIso8601String(),
+          createdAt: now.subtract(const Duration(hours: 1)).toIso8601String(),
         ),
         NotificationItem(
           id: 'n2',
-          type: 'push',
-          title: 'Test Push Notification',
-          body: 'This is a test notification triggered from the UI. lúc 14:23:14',
-          category: 'system',
+          cameraId: 'cam_facetime',
+          type: 'family',
+          title: 'Nhận diện thành viên: Anh Quốc',
+          body: 'Đã nhận diện thành viên gia đình Anh Quốc tại camera Facetime HD Cam',
+          category: 'family',
           isRead: true,
-          createdAt: now.subtract(const Duration(hours: 2, minutes: 18)).toIso8601String(),
+          createdAt: now.subtract(const Duration(hours: 2, minutes: 15)).toIso8601String(),
         ),
         NotificationItem(
           id: 'n3',
-          type: 'push',
-          title: 'Test Push Notification',
-          body: 'This is a test notification triggered from the UI. lúc 14:00:15',
-          category: 'system',
-          isRead: true,
-          createdAt: now.subtract(const Duration(hours: 2, minutes: 41)).toIso8601String(),
+          cameraId: 'cam_facetime',
+          type: 'danger',
+          title: 'Cảnh báo rủi ro: FIRE',
+          body: 'Phát hiện FIRE tại camera Facetime HD Cam',
+          category: 'risk',
+          isRead: false,
+          createdAt: now.subtract(const Duration(hours: 3)).toIso8601String(),
         ),
         NotificationItem(
           id: 'n4',
-          type: 'push',
-          title: 'Test Push Notification',
-          body: 'This is a test notification triggered from the UI. lúc 13:55:42',
-          category: 'system',
-          isRead: true,
-          createdAt: now.subtract(const Duration(hours: 3)).toIso8601String(),
+          cameraId: 'cam_facetime',
+          type: 'fall',
+          title: 'Cảnh báo: Phát hiện té ngã',
+          body: 'Phát hiện tư thế té ngã tại camera Facetime HD Cam',
+          category: 'fall',
+          isRead: false,
+          createdAt: now.subtract(const Duration(days: 1, hours: 2)).toIso8601String(),
         ),
         NotificationItem(
           id: 'n5',
           cameraId: 'cam_facetime',
-          type: 'danger',
-          title: 'Cảnh báo rủi ro: FIRE',
-          body: 'Phát hiện FIRE tại camera Facetime HD Cam 25/08/2026 lúc 00:48:53',
-          category: 'risk',
+          type: 'stranger',
+          title: 'Cảnh báo: Người lạ mặt',
+          body: 'Phát hiện người lạ mặt xuất hiện trước camera Facetime HD Cam',
+          category: 'stranger',
           isRead: false,
-          createdAt: now.subtract(const Duration(days: 3)).toIso8601String(),
-        ),
-        NotificationItem(
-          id: 'n6',
-          cameraId: 'cam_facetime',
-          type: 'danger',
-          title: 'Cảnh báo rủi ro: SMOKE',
-          body: 'Phát hiện SMOKE tại camera Facetime HD Cam 25/08/2026 lúc 00:48:51',
-          category: 'risk',
-          isRead: false,
-          createdAt: now.subtract(const Duration(days: 3, minutes: 2)).toIso8601String(),
-        ),
-        NotificationItem(
-          id: 'n7',
-          cameraId: 'cam_facetime',
-          type: 'fall',
-          title: 'Cảnh báo: Phát hiện té ngã',
-          body: 'Phát hiện té ngã tại camera Facetime HD Cam 25/08/2026 lúc 00:47:48',
-          category: 'fall',
-          isRead: false,
-          createdAt: now.subtract(const Duration(days: 3, minutes: 3)).toIso8601String(),
+          createdAt: now.subtract(const Duration(days: 2)).toIso8601String(),
         ),
       ];
       _unreadCount = _notifications.where((n) => !n.isRead).length;
@@ -149,11 +133,31 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     await ref.read(apiClientProvider).markNotificationRead(item.id);
   }
 
+  Future<void> _handleMarkAllRead() async {
+    setState(() {
+      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
+      _unreadCount = 0;
+    });
+    await ref.read(apiClientProvider).markAllNotificationsRead();
+  }
+
+  Future<void> _handleDelete(String id) async {
+    setState(() {
+      final removed = _notifications.firstWhere((n) => n.id == id, orElse: () => _notifications.first);
+      if (!removed.isRead) {
+        _unreadCount = (_unreadCount - 1).clamp(0, 999);
+      }
+      _notifications.removeWhere((n) => n.id == id);
+    });
+    await ref.read(apiClientProvider).deleteNotification(id);
+  }
+
   Future<void> _handleClearAll(AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.deleteAll),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l10n.deleteAll, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         content: Text(l10n.confirmDeleteAll),
         actions: [
           TextButton(
@@ -178,6 +182,15 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         _unreadCount = 0;
       });
       await ref.read(apiClientProvider).clearAllNotifications();
+    }
+  }
+
+  void _handleItemClick(NotificationItem item) {
+    if (!item.isRead) {
+      _handleMarkRead(item);
+    }
+    if (item.cameraId != null || item.body.toLowerCase().contains('camera')) {
+      Navigator.pop(context);
     }
   }
 
@@ -228,7 +241,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         titleSpacing: 16,
         title: Row(
           children: [
-            // Light orange bell icon container
+            // Bell icon container
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -243,18 +256,40 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // Title and subtitle column
+            // Title and subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    l10n.notificationTitle,
-                    style: const TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        l10n.notificationTitle,
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (unreadCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -280,10 +315,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       ),
       body: Column(
         children: [
-          // Filter Tabs & Delete Action Bar
+          // Filter Tabs & Actions Bar
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -310,27 +345,54 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   ),
                 ),
 
-                // Delete All Button (Without Test Push button)
-                InkWell(
-                  onTap: _notifications.isEmpty ? null : () => _handleClearAll(l10n),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text(
-                          l10n.deleteAll,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF64748B),
+                // Actions: Mark All Read & Clear All
+                Row(
+                  children: [
+                    if (unreadCount > 0)
+                      InkWell(
+                        onTap: _handleMarkAllRead,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFFE85D10)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Đã đọc hết',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFE85D10),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    if (_notifications.isNotEmpty)
+                      InkWell(
+                        onTap: () => _handleClearAll(l10n),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                              const SizedBox(width: 4),
+                              Text(
+                                l10n.deleteAll,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -340,7 +402,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           // Notifications List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFE85D10)))
                 : _filteredList.isEmpty
                     ? Center(
                         child: Column(
@@ -357,6 +419,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: _fetchNotifications,
+                        color: const Color(0xFFE85D10),
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           itemCount: _filteredList.length,
@@ -382,7 +445,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       borderRadius: BorderRadius.circular(9),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
@@ -399,7 +462,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
           ),
@@ -409,143 +472,184 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   Widget _buildNotificationCard(NotificationItem item, AppLocalizations l10n) {
-    final isDangerOrFall = item.category == 'risk' || item.category == 'fall' || item.type == 'danger';
+    final isFamily = item.category == 'family' || item.type == 'family';
+    final isGuest = item.category == 'guest' || item.type == 'guest';
+    final isDanger = item.category == 'risk' || item.category == 'fall' || item.type == 'danger' || item.type == 'fall' || item.category == 'stranger';
     final hasCameraPlayback = item.cameraId != null || item.body.toLowerCase().contains('camera');
     final relativeTime = _formatRelativeTime(item.createdAt, l10n);
 
-    return InkWell(
-      onTap: () => _handleMarkRead(item),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: item.isRead ? const Color(0xFFE2E8F0) : const Color(0xFFFED7AA),
-            width: item.isRead ? 1 : 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Leading Round/Square Icon Badge
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isDangerOrFall
-                    ? Icons.notifications_none_rounded
-                    : Icons.notifications_none_rounded,
-                color: const Color(0xFF334155),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
+    Color categoryColor;
+    Color categoryBg;
+    IconData categoryIcon;
 
-            // Content Area
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title & Time Row
-                  Row(
+    if (isFamily) {
+      categoryColor = const Color(0xFF10B981);
+      categoryBg = const Color(0xFFECFDF5);
+      categoryIcon = Icons.verified_user_rounded;
+    } else if (isGuest) {
+      categoryColor = const Color(0xFF3B82F6);
+      categoryBg = const Color(0xFFEFF6FF);
+      categoryIcon = Icons.handshake_outlined;
+    } else if (isDanger) {
+      categoryColor = const Color(0xFFEF4444);
+      categoryBg = const Color(0xFFFEF2F2);
+      categoryIcon = Icons.warning_amber_rounded;
+    } else {
+      categoryColor = const Color(0xFFE85D10);
+      categoryBg = const Color(0xFFFFF7ED);
+      categoryIcon = Icons.notifications_none_rounded;
+    }
+
+    return Dismissible(
+      key: Key(item.id),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => _handleDelete(item.id),
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEF4444),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+      ),
+      child: InkWell(
+        onTap: () => _handleItemClick(item),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: item.isRead ? const Color(0xFFE2E8F0) : categoryColor.withOpacity(0.5),
+              width: item.isRead ? 1 : 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                // Left stripe for unread notifications
+                if (!item.isRead)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4,
+                    child: Container(color: categoryColor),
+                  ),
+
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (!item.isRead) const SizedBox(width: 4),
+
+                      // Leading category icon badge
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: categoryBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: categoryColor.withOpacity(0.2)),
+                        ),
+                        child: Icon(categoryIcon, color: categoryColor, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Content Area
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (isDangerOrFall) ...[
-                              const Text('⚠️ ', style: TextStyle(fontSize: 13)),
-                            ],
-                            Flexible(
-                              child: Text(
-                                item.title,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
+                            // Title & Time Row
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: !item.isRead ? FontWeight.bold : FontWeight.w600,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                const SizedBox(width: 6),
+                                Text(
+                                  relativeTime,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+
+                            // Body Description
+                            Text(
+                              item.body,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF475569),
+                                height: 1.35,
                               ),
                             ),
+
+                            // Action Link (Xem lại camera)
+                            if (hasCameraPlayback) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.videocam_outlined, size: 14, color: Color(0xFFE85D10)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    l10n.viewPlayback,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFE85D10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        relativeTime,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF94A3B8),
-                        ),
+
+                      // Delete action icon
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFCBD5E1)),
+                        onPressed: () => _handleDelete(item.id),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 5),
-
-                  // Body Description
-                  Text(
-                    item.body,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF475569),
-                      height: 1.35,
-                    ),
-                  ),
-
-                  // Action Link (Xem lại camera)
-                  if (hasCameraPlayback) ...[
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.videocam_outlined,
-                              size: 15,
-                              color: Color(0xFFE85D10),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              l10n.viewPlayback,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFE85D10),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-

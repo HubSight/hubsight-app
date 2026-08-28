@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/models/device_models.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/socket_service.dart';
 import 'models/camera_models.dart';
@@ -22,19 +23,29 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   List<CameraItem> _cameras = [];
   CameraItem? _selectedCam;
   DateTime _selectedDate = DateTime.now();
+  List<int> _availableDays = [];
   List<Recording> _recordings = [];
   Recording? _activeRecording;
-  
+
   bool _isLoadingCameras = true;
   bool _isLoadingTimeline = false;
-  
+  bool _isPlayingArchive = true;
+  double _archiveCurrentSeconds = 0.0;
+  double _archiveDurationSeconds = 30.0;
+  double _playbackSpeed = 1.0;
+  bool _showSpeedMenu = false;
+
   // Mode: 'live' | 'archive'
   String _mode = 'live';
   String _filterPeriod = 'all'; // 'all', 'morning', 'afternoon', 'evening'
   bool _isTimelineCollapsed = false;
 
+  List<RecognitionLog> _recognitionLogs = [];
+  bool _isLoadingLogs = false;
+
   StreamSubscription? _notificationSub;
   StreamSubscription? _cameraEventSub;
+  Timer? _archiveTimer;
 
   @override
   void initState() {
@@ -43,10 +54,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   }
 
   Future<void> _initData() async {
-    // 1. Fetch Cameras
     await _fetchCameras();
 
-    // 2. Connect Socket & Listen to events
     final socketService = ref.read(socketServiceProvider);
     socketService.connect();
 
@@ -73,7 +82,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       if (!mounted) return;
       final eventType = data['event_type'];
       final camId = data['id']?.toString();
-      
+
       setState(() {
         _cameras = _cameras.map((c) {
           if (c.id == camId) {
@@ -107,6 +116,15 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           );
         }
       });
+
+      // Camera stopped prompt
+      if (eventType == 'camera.stopped' && data['alternative_id'] != null) {
+        _showAlternativeCameraDialog(
+          cameraName: data['name'] ?? 'Camera',
+          alternativeId: data['alternative_id'],
+          alternativeName: data['alternative_name'] ?? 'Alternative Camera',
+        );
+      }
     });
   }
 
@@ -118,23 +136,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         setState(() {
           _cameras = cameras;
           if (cameras.isNotEmpty && _selectedCam == null) {
-            // Prefer running camera if available, else first camera
-            _selectedCam = cameras.firstWhere(
-              (c) => !c.isStopped,
-              orElse: () => cameras.first,
-            );
+            _selectedCam = cameras.firstWhere((c) => !c.isStopped, orElse: () => cameras.first);
           }
           _isLoadingCameras = false;
         });
 
         if (_selectedCam != null) {
+          _fetchAvailableDays();
           _fetchTimeline();
+          _fetchRecognitionLogs();
         }
       }
     } catch (e) {
       debugPrint('Error fetching cameras: $e');
       if (mounted) {
-        // Fallback demo camera if backend has not yet populated cameras
         if (_cameras.isEmpty) {
           final fallbackCam = CameraItem(
             id: 'cam_facetime',
@@ -153,20 +168,42 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     }
   }
 
+  Future<void> _fetchAvailableDays() async {
+    if (_selectedCam == null) return;
+    try {
+      final days = await ref.read(apiClientProvider).getAvailableDays(
+            _selectedCam!.id,
+            _selectedDate.year,
+            _selectedDate.month,
+          );
+      if (mounted) {
+        setState(() => _availableDays = days);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchTimeline() async {
     if (_selectedCam == null) return;
     setState(() => _isLoadingTimeline = true);
+
     try {
       final recordings = await ref.read(apiClientProvider).getTimelineRecordings(
-        _selectedCam!.id,
-        _selectedDate,
-      );
+            _selectedCam!.id,
+            _selectedDate,
+          );
+
       if (mounted) {
         setState(() {
           _recordings = recordings;
           _isLoadingTimeline = false;
-          if (recordings.isNotEmpty && _mode == 'archive') {
-            _activeRecording = recordings.first;
+          if (recordings.isNotEmpty) {
+            _activeRecording ??= recordings.first;
+            _archiveDurationSeconds = (_activeRecording!.durationSeconds > 0
+                    ? _activeRecording!.durationSeconds
+                    : 30)
+                .toDouble();
+          } else {
+            _activeRecording = null;
           }
         });
       }
@@ -176,153 +213,157 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     }
   }
 
-  void _onSelectCamera(CameraItem camera) {
+  Future<void> _fetchRecognitionLogs() async {
+    if (_selectedCam == null) return;
+    setState(() => _isLoadingLogs = true);
+    try {
+      final logs = await ref.read(apiClientProvider).getRecognitionLogs(_selectedCam!.id);
+      if (mounted) {
+        setState(() {
+          _recognitionLogs = logs;
+          _isLoadingLogs = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingLogs = false);
+    }
+  }
+
+  void _showAlternativeCameraDialog({
+    required String cameraName,
+    required String alternativeId,
+    required String alternativeName,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Camera đã tắt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text('“$cameraName” hiện đang tắt. Bạn có muốn chuyển sang “$alternativeName” không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Ở lại', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE85D10),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              final target = _cameras.firstWhere(
+                (c) => c.id == alternativeId,
+                orElse: () => CameraItem(id: alternativeId, name: alternativeName),
+              );
+              _onSelectCamera(target);
+            },
+            child: const Text('Chuyển camera'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onSelectCamera(CameraItem cam) {
     setState(() {
-      _selectedCam = camera;
+      _selectedCam = cam;
       _mode = 'live';
       _activeRecording = null;
+      _recordings = [];
+    });
+    _fetchAvailableDays();
+    _fetchTimeline();
+    _fetchRecognitionLogs();
+  }
+
+  void _onSelectDate(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+      _mode = 'archive';
     });
     _fetchTimeline();
   }
 
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFE85D10),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF1E293B),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
+  void _onSelectRecording(Recording rec, [double startOffsetSeconds = 0.0]) {
+    setState(() {
+      _mode = 'archive';
+      _activeRecording = rec;
+      _archiveCurrentSeconds = startOffsetSeconds;
+      _archiveDurationSeconds = (rec.durationSeconds > 0 ? rec.durationSeconds : 30).toDouble();
+      _isPlayingArchive = true;
+    });
+    _startArchiveTimer();
+  }
 
-    if (picked != null && picked != _selectedDate) {
+  void _startArchiveTimer() {
+    _archiveTimer?.cancel();
+    _archiveTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (!_isPlayingArchive || !mounted) return;
       setState(() {
-        _selectedDate = picked;
+        _archiveCurrentSeconds += 0.5 * _playbackSpeed;
+        if (_archiveCurrentSeconds >= _archiveDurationSeconds) {
+          _archiveCurrentSeconds = _archiveDurationSeconds;
+          _isPlayingArchive = false;
+        }
       });
-      _fetchTimeline();
+    });
+  }
+
+  void _toggleArchivePlay() {
+    setState(() {
+      _isPlayingArchive = !_isPlayingArchive;
+      if (_isPlayingArchive && _archiveCurrentSeconds >= _archiveDurationSeconds) {
+        _archiveCurrentSeconds = 0.0;
+      }
+    });
+    if (_isPlayingArchive) {
+      _startArchiveTimer();
+    } else {
+      _archiveTimer?.cancel();
     }
   }
 
-  void _showCameraPickerModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        l10n.selectCamera,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Color(0xFF64748B)),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _cameras.length,
-                    itemBuilder: (context, index) {
-                      final cam = _cameras[index];
-                      final isSelected = cam.id == _selectedCam?.id;
-                      return ListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFE85D10).withOpacity(0.1)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            cam.isStopped ? Icons.videocam_off_outlined : Icons.videocam_outlined,
-                            color: isSelected
-                                ? const Color(0xFFE85D10)
-                                : (cam.isStopped ? Colors.grey : const Color(0xFF10B981)),
-                          ),
-                        ),
-                        title: Text(
-                          cam.name,
-                          style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: const Color(0xFF1E293B),
-                          ),
-                        ),
-                        subtitle: Text(
-                          cam.isStopped ? l10n.cameraStopped : l10n.cameraOnline,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: cam.isStopped ? const Color(0xFF94A3B8) : const Color(0xFF10B981),
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? const Icon(Icons.check_circle, color: Color(0xFFE85D10))
-                            : null,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _onSelectCamera(cam);
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  void _handleGoLive() {
+    setState(() {
+      _mode = 'live';
+      _isPlayingArchive = false;
+    });
+    _archiveTimer?.cancel();
   }
 
   @override
   void dispose() {
     _notificationSub?.cancel();
     _cameraEventSub?.cancel();
+    _archiveTimer?.cancel();
     super.dispose();
   }
 
   List<Recording> get _filteredRecordings {
     if (_filterPeriod == 'all') return _recordings;
-    return _recordings.filterByPeriod(_filterPeriod);
+    return _recordings.where((rec) {
+      final hour = DateTime.tryParse(rec.startAt)?.hour ?? 0;
+      if (_filterPeriod == 'morning') return hour >= 0 && hour < 12;
+      if (_filterPeriod == 'afternoon') return hour >= 12 && hour < 18;
+      if (_filterPeriod == 'evening') return hour >= 18 && hour < 24;
+      return true;
+    }).toList();
+  }
+
+  String _formatSeconds(double sec) {
+    final s = sec.toInt();
+    final m = s ~/ 60;
+    final r = s % 60;
+    return '${m.toString().padLeft(2, '0')}:${r.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isCamStopped = _selectedCam?.isStopped ?? false;
     final dateFormatted = DateFormat('dd/MM/yyyy').format(_selectedDate);
     final dateIsoFormatted = DateFormat('yyyy-MM-dd').format(_selectedDate);
-
-    final isCamStopped = _selectedCam?.isStopped ?? true;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -331,8 +372,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded, color: Color(0xFF1E293B)),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         title: Row(
           children: [
             Container(
@@ -341,17 +384,13 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 color: const Color(0xFFE85D10),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.camera_alt_outlined,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              'HubSight',
-              style: TextStyle(
-                fontSize: 19,
+            const SizedBox(width: 8),
+            Text(
+              l10n.appTitle,
+              style: const TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF0F172A),
               ),
@@ -360,18 +399,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: Color(0xFF475569)),
+            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B)),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const NotificationScreen()),
               );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Color(0xFF475569)),
-            onPressed: () {
-              _scaffoldKey.currentState?.openDrawer();
             },
           ),
           const SizedBox(width: 8),
@@ -380,25 +413,33 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           await _fetchCameras();
+          await _fetchAvailableDays();
           await _fetchTimeline();
         },
+        color: const Color(0xFFE85D10),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Top Video Area (Player / Offline Screen)
+              // 1. Top Video Player Area
               _buildVideoPlayerSection(isCamStopped, l10n),
 
               const SizedBox(height: 12),
 
-              // 2. Camera Device & Date Selection Card
+              // 2. Camera Device & Date Picker Controls Card
               _buildControlsCard(dateFormatted, l10n),
 
               const SizedBox(height: 14),
 
-              // 3. Event-based Playback Dark Card
+              // 3. Event-based 24h Playback Timeline Dark Card
               _buildEventPlaybackSection(dateIsoFormatted, l10n),
+
+              const SizedBox(height: 14),
+
+              // 4. Face Recognition Logs Sidebar Section
+              if (_selectedCam != null && _selectedCam!.enableAi)
+                _buildRecognitionLogsSection(l10n),
 
               const SizedBox(height: 30),
             ],
@@ -414,31 +455,41 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       width: double.infinity,
       height: 250,
       color: Colors.black,
-      child: isStopped
+      child: isStopped && _mode == 'live'
           ? _buildStoppedCameraState(l10n)
           : _mode == 'live'
               ? Stack(
+                  fit: StackFit.expand,
                   children: [
-                    WebRTCViewer(cameraId: _selectedCam!.id),
+                    WebRTCViewer(
+                      cameraId: _selectedCam?.id ?? '',
+                      enableAi: _selectedCam?.enableAi ?? true,
+                      showBbox: _selectedCam?.showBbox ?? true,
+                    ),
+                    // LIVE Badge Pin
                     Positioned(
                       top: 12,
                       left: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 8),
+                          ],
                         ),
                         child: Row(
                           children: const [
                             Icon(Icons.circle, color: Colors.white, size: 8),
-                            SizedBox(width: 5),
+                            SizedBox(width: 6),
                             Text(
                               'LIVE',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
@@ -447,21 +498,206 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     ),
                   ],
                 )
-              : Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.play_circle_fill, size: 64, color: Color(0xFFE85D10)),
-                      const SizedBox(height: 8),
-                      Text(
-                        _activeRecording != null
-                            ? '${l10n.playingArchive}: ${_activeRecording!.startAt}'
-                            : l10n.playingArchive,
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ],
+              : _buildArchiveVideoPlayer(l10n),
+    );
+  }
+
+  // --- Archive Video Player with YouTube-style Controls ---
+  Widget _buildArchiveVideoPlayer(AppLocalizations l10n) {
+    final progress = _archiveDurationSeconds > 0
+        ? (_archiveCurrentSeconds / _archiveDurationSeconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Simulated video frame / poster
+        Container(
+          color: const Color(0xFF020617),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.videocam_rounded, size: 54, color: Color(0xFFE85D10)),
+                const SizedBox(height: 8),
+                Text(
+                  _activeRecording != null
+                      ? '${_activeRecording!.startAt.replaceAll("T", " ")}'
+                      : l10n.playingArchive,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Top Gradient & "Switch to Live" Button
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black87, Colors.transparent],
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Start - End Segment Time
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Text(
+                    _activeRecording?.startAt.split('T').last.split('.').first ?? '00:00:00',
+                    style: const TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
+
+                // Switch to Live Button
+                ElevatedButton.icon(
+                  onPressed: _handleGoLive,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE85D10),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  icon: const Icon(Icons.radio_button_checked, size: 13),
+                  label: const Text('Trực tiếp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Bottom Controls Bar
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Colors.black87, Colors.transparent],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Progress Scrub Slider
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                    activeTrackColor: const Color(0xFFE85D10),
+                    inactiveTrackColor: Colors.white24,
+                    thumbColor: const Color(0xFFE85D10),
+                  ),
+                  child: Slider(
+                    value: progress,
+                    onChanged: (val) {
+                      setState(() {
+                        _archiveCurrentSeconds = val * _archiveDurationSeconds;
+                      });
+                    },
+                  ),
+                ),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Play / Pause & Skip
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _isPlayingArchive ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: _toggleArchivePlay,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.replay_10_rounded, color: Colors.white70, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _archiveCurrentSeconds = (_archiveCurrentSeconds - 10).clamp(0.0, _archiveDurationSeconds);
+                            });
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.forward_10_rounded, color: Colors.white70, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _archiveCurrentSeconds = (_archiveCurrentSeconds + 10).clamp(0.0, _archiveDurationSeconds);
+                            });
+                          },
+                        ),
+                        Text(
+                          '${_formatSeconds(_archiveCurrentSeconds)} / ${_formatSeconds(_archiveDurationSeconds)}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Speed Selector
+                    PopupMenuButton<double>(
+                      initialValue: _playbackSpeed,
+                      onSelected: (rate) {
+                        setState(() => _playbackSpeed = rate);
+                      },
+                      itemBuilder: (context) => [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((rate) {
+                        return PopupMenuItem<double>(
+                          value: rate,
+                          child: Text('${rate}x', style: TextStyle(
+                            fontWeight: _playbackSpeed == rate ? FontWeight.bold : FontWeight.normal,
+                            color: _playbackSpeed == rate ? const Color(0xFFE85D10) : Colors.black87,
+                          )),
+                        );
+                      }).toList(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${_playbackSpeed}x',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -474,51 +710,46 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Dark icon container
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2430),
+                color: const Color(0xFF1E293B),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2D3748), width: 1),
+                border: Border.all(color: const Color(0xFF334155)),
               ),
               child: const Icon(
                 Icons.videocam_off_outlined,
-                color: Color(0xFFCBD5E1),
+                color: Color(0xFF94A3B8),
                 size: 28,
               ),
             ),
-            const SizedBox(height: 16),
-            // Tag
+            const SizedBox(height: 12),
             Text(
               l10n.cameraStoppedStatus,
               style: const TextStyle(
-                color: Color(0xFF60A5FA),
-                fontSize: 11,
+                color: Color(0xFF64748B),
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 2.5,
+                letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 8),
-            // Title
+            const SizedBox(height: 4),
             Text(
-              '“$camName” đã tắt',
+              l10n.cameraStoppedTitle(camName),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            // Description
+            const SizedBox(height: 6),
             Text(
               l10n.cameraStoppedDesc,
               style: const TextStyle(
                 color: Color(0xFF94A3B8),
-                fontSize: 12.5,
-                height: 1.4,
+                fontSize: 11.5,
+                height: 1.3,
               ),
               textAlign: TextAlign.center,
             ),
@@ -532,122 +763,123 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   Widget _buildControlsCard(String dateFormatted, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Row 1: Camera Selector
           Row(
             children: [
-              const Icon(Icons.camera_alt_outlined, size: 18, color: Color(0xFF64748B)),
-              const SizedBox(width: 8),
-              Text(
-                l10n.deviceLabel,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF475569),
+              // Device Selector Pill
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.deviceLabel,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _showCameraPicker(l10n),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _selectedCam?.name ?? l10n.selectCamera,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+
               const SizedBox(width: 12),
+
+              // Date Picker Pill
               Expanded(
-                child: InkWell(
-                  onTap: _showCameraPickerModal,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                      borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.dateLabel,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _selectedCam?.name ?? 'Chọn camera',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF1E293B),
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _showDatePicker(),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                dateFormatted,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
+                            ],
                           ),
                         ),
-                        const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 20),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
 
-          // Row 2: Date Selector
+          // Recordings Summary Count
           Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
-              const SizedBox(width: 8),
-              Text(
-                l10n.dateLabel,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF475569),
-                ),
-              ),
-              const SizedBox(width: 28),
-              Expanded(
-                child: InkWell(
-                  onTap: _selectDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          dateFormatted,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 20),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Row 3: Records info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
                 l10n.recordsLabel,
@@ -659,9 +891,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                _recordings.isEmpty
-                    ? l10n.noData
-                    : l10n.recordsCount(_recordings.length),
+                _recordings.isEmpty ? l10n.noData : l10n.recordsCount(_recordings.length),
                 style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF94A3B8),
@@ -675,7 +905,79 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     );
   }
 
-  // --- 3. Event-based Playback Dark Card ---
+  void _showCameraPicker(AppLocalizations l10n) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  l10n.selectCamera,
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _cameras.length,
+                  itemBuilder: (context, index) {
+                    final cam = _cameras[index];
+                    final isSelected = cam.id == _selectedCam?.id;
+                    return ListTile(
+                      leading: Icon(
+                        cam.isStopped ? Icons.videocam_off_outlined : Icons.videocam_outlined,
+                        color: isSelected ? const Color(0xFFE85D10) : Colors.grey,
+                      ),
+                      title: Text(cam.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                      trailing: isSelected ? const Icon(Icons.check, color: Color(0xFFE85D10)) : null,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _onSelectCamera(cam);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showDatePicker() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      selectableDayPredicate: (date) {
+        if (_availableDays.isEmpty) return true;
+        return _availableDays.contains(date.day);
+      },
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: Color(0xFFE85D10)),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      _onSelectDate(picked);
+    }
+  }
+
+  // --- 3. Event-based 24h Playback Timeline Section ---
   Widget _buildEventPlaybackSection(String dateIsoFormatted, AppLocalizations l10n) {
     final count = _recordings.length;
 
@@ -683,21 +985,14 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A), // Dark Slate / Navy
+        color: const Color(0xFF0F172A), // Dark Slate
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF1E293B)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Bar
+          // Header Bar with Sparkles
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -708,11 +1003,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF5E3211)),
                 ),
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: Color(0xFFF97316),
-                  size: 20,
-                ),
+                child: const Icon(Icons.auto_awesome, color: Color(0xFFF97316), size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -725,38 +1016,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF334155)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.calendar_today_outlined, size: 11, color: Color(0xFFF97316)),
-                          const SizedBox(width: 4),
-                          Text(
-                            dateIsoFormatted,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'monospace',
-                              color: Color(0xFFCBD5E1),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      count == 0
-                          ? l10n.noEventsToday
-                          : l10n.eventsToday(count),
+                      count == 0 ? l10n.noEventsToday : l10n.eventsToday(count),
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
@@ -771,11 +1035,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
           const SizedBox(height: 16),
 
-          // Filters & Live Action Row
+          // Filters Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Period Filter Tabs
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
@@ -793,51 +1056,28 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 ),
               ),
 
-              // Live Stream Button / Toggle
+              // Live Action Button
               InkWell(
-                onTap: () {
-                  setState(() {
-                    _mode = 'live';
-                    _activeRecording = null;
-                  });
-                },
+                onTap: _handleGoLive,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF020617),
+                    color: _mode == 'live' ? const Color(0xFFE85D10) : const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _mode == 'live' ? const Color(0xFFF97316) : const Color(0xFF334155),
-                    ),
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: _mode == 'live' ? const Color(0xFFF97316) : const Color(0xFF64748B),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        Icons.sensors,
-                        size: 13,
-                        color: _mode == 'live' ? const Color(0xFFF97316) : const Color(0xFF64748B),
-                      ),
+                      Icon(Icons.radio_button_checked, size: 12, color: _mode == 'live' ? Colors.white : const Color(0xFF94A3B8)),
                       const SizedBox(width: 4),
                       Text(
-                        l10n.live,
+                        'Live',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: _mode == 'live' ? const Color(0xFFF97316) : const Color(0xFF94A3B8),
+                          color: _mode == 'live' ? Colors.white : const Color(0xFF94A3B8),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_up, size: 14, color: Color(0xFF94A3B8)),
                     ],
                   ),
                 ),
@@ -845,62 +1085,37 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 24-Hour Timeline Bar
+          // 24h Timeline Bar
           Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('03:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('09:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('15:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('21:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                    Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                  ],
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                  Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                  Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                  Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                  Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                ],
               ),
               const SizedBox(height: 6),
-              // Timeline Bar Track
               Container(
-                height: 36,
+                height: 32,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: const Color(0xFF020617),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFF1E293B)),
                 ),
                 child: Stack(
                   children: [
-                    // Vertical grid lines
-                    Row(
-                      children: List.generate(24, (index) {
-                        return Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border(
-                                right: BorderSide(
-                                  color: const Color(0xFF1E293B).withOpacity(0.5),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    // Event Markers
                     ..._filteredRecordings.map((rec) {
                       final start = DateTime.tryParse(rec.startAt) ?? DateTime.now();
                       final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
-                      final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.98);
+                      final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.95);
+                      final isSelected = _activeRecording?.id == rec.id;
 
                       Color markerColor;
                       switch (rec.eventType) {
@@ -917,31 +1132,17 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           markerColor = const Color(0xFF38BDF8);
                       }
 
-                      final isSelected = _activeRecording?.id == rec.id;
-
                       return Positioned(
-                        left: leftRatio * 320, // Approx width percentage
-                        top: 4,
-                        bottom: 4,
+                        left: leftRatio * 300,
+                        top: 3,
+                        bottom: 3,
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _mode = 'archive';
-                              _activeRecording = rec;
-                            });
-                          },
+                          onTap: () => _onSelectRecording(rec),
                           child: Container(
-                            width: 8,
+                            width: 6,
                             decoration: BoxDecoration(
-                              color: markerColor,
-                              borderRadius: BorderRadius.circular(4),
-                              border: isSelected ? Border.all(color: Colors.white, width: 1.5) : null,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: markerColor.withOpacity(0.6),
-                                  blurRadius: 4,
-                                ),
-                              ],
+                              color: isSelected ? Colors.white : markerColor,
+                              borderRadius: BorderRadius.circular(3),
                             ),
                           ),
                         ),
@@ -955,7 +1156,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
           const SizedBox(height: 16),
 
-          // Recordings list if any
+          // Recordings Clips Grid / List
           if (_filteredRecordings.isNotEmpty) ...[
             const Divider(color: Color(0xFF1E293B)),
             const SizedBox(height: 8),
@@ -966,39 +1167,60 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               itemBuilder: (context, index) {
                 final rec = _filteredRecordings[index];
                 final isSelected = _activeRecording?.id == rec.id;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
+                final duration = rec.durationSeconds > 0 ? rec.durationSeconds : 30;
+
+                return InkWell(
+                  onTap: () => _onSelectRecording(rec),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(8),
+                      color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF0B132B),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFFE85D10) : const Color(0xFF1E293B),
+                      ),
                     ),
-                    child: const Icon(Icons.videocam, color: Color(0xFFF97316), size: 20),
-                  ),
-                  title: Text(
-                    l10n.recordingEvent(rec.eventType.toUpperCase()),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected ? const Color(0xFFF97316) : Colors.white,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF020617),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isSelected ? Icons.play_arrow_rounded : Icons.videocam_outlined,
+                            color: const Color(0xFFE85D10),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.recordingEvent(rec.eventType.toUpperCase()),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected ? const Color(0xFFF97316) : Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${rec.startAt.replaceAll("T", " ")} (${duration}s)',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.graphic_eq_rounded, color: Color(0xFFE85D10), size: 20),
+                      ],
                     ),
-                  ),
-                  subtitle: Text(
-                    '${rec.startAt} (${rec.durationSeconds}s)',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isSelected ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                      color: const Color(0xFFF97316),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _mode = 'archive';
-                        _activeRecording = rec;
-                      });
-                    },
                   ),
                 );
               },
@@ -1009,14 +1231,98 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     );
   }
 
+  // --- 4. Face Recognition Logs Sidebar Section ---
+  Widget _buildRecognitionLogsSection(AppLocalizations l10n) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.face_retouching_natural_rounded, color: Color(0xFFE85D10), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Nhật ký nhận diện khuôn mặt',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              Text(
+                '${_recognitionLogs.length} sự kiện',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isLoadingLogs)
+            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE85D10))))
+          else if (_recognitionLogs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Center(
+                child: Text('Chưa có dữ liệu nhận diện khuôn mặt', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _recognitionLogs.length.clamp(0, 5),
+              itemBuilder: (context, index) {
+                final log = _recognitionLogs[index];
+                return ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    backgroundImage: log.thumbnailUrl != null ? NetworkImage(log.thumbnailUrl!) : null,
+                    child: log.thumbnailUrl == null ? const Icon(Icons.person, color: Color(0xFF64748B), size: 18) : null,
+                  ),
+                  title: Text(log.memberName ?? 'Người lạ', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  subtitle: Text(log.createdAt, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Text(
+                      '${(log.confidence * 100).toInt()}%',
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilterTab(String key, String label) {
     final isSelected = _filterPeriod == key;
-
     return InkWell(
       onTap: () => setState(() => _filterPeriod = key),
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -1027,25 +1333,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? const Color(0xFFFB923C) : const Color(0xFF94A3B8),
+            color: isSelected ? const Color(0xFFF97316) : const Color(0xFF94A3B8),
           ),
         ),
       ),
     );
   }
 }
-
-extension RecordingFilter on List<Recording> {
-  List<Recording> filterByPeriod(String period) {
-    return where((rec) {
-      final start = DateTime.tryParse(rec.startAt);
-      if (start == null) return true;
-      final hour = start.hour;
-      if (period == 'morning') return hour >= 0 && hour < 12;
-      if (period == 'afternoon') return hour >= 12 && hour < 18;
-      if (period == 'evening') return hour >= 18 && hour < 24;
-      return true;
-    }).toList();
-  }
-}
-
