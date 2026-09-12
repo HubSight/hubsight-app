@@ -94,3 +94,4 @@ coverage/
 .env.*
 !.env.example
 
+build/
