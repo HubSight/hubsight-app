@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Fullscreen maintenance screen displayed when HTTP 503 Kill-Switch is triggered.
 class MaintenanceScreen extends ConsumerStatefulWidget {
@@ -76,7 +77,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     final maintenanceEx = ref.watch(maintenanceStateProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: HubSightColors.bgDark,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28.0),
@@ -88,16 +89,16 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   width: 90,
                   height: 90,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE85D10).withOpacity(0.15),
+                    color: HubSightColors.primaryBg,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFFE85D10).withOpacity(0.4),
+                      color: HubSightColors.primary.withValues(alpha: 0.4),
                       width: 2,
                     ),
                   ),
                   child: const Icon(
                     Icons.build_circle_outlined,
-                    color: Color(0xFFE85D10),
+                    color: HubSightColors.primary,
                     size: 48,
                   ),
                 ),
@@ -107,7 +108,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: HubSightColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -116,7 +117,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   maintenanceEx?.message ?? l10n.maintenanceMessage,
                   style: const TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF94A3B8),
+                    color: HubSightColors.textMuted,
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,
@@ -126,16 +127,16 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    color: HubSightColors.cardDark,
+                    borderRadius: HubSightRadius.roundedCard,
+                    border: Border.all(color: HubSightColors.borderDark),
                   ),
                   child: Text(
                     l10n.retryAfterCountdown(_remainingSeconds),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFF8FAFC),
+                      color: HubSightColors.textPrimary,
                     ),
                   ),
                 ),
@@ -146,10 +147,10 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   child: ElevatedButton(
                     onPressed: _isChecking ? null : _handleRetry,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE85D10),
+                      backgroundColor: HubSightColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: HubSightRadius.roundedXl,
                       ),
                       elevation: 0,
                     ),

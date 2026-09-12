@@ -225,7 +225,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -252,10 +252,10 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
           if (_isInitializing)
             Container(
               color: Colors.black54,
-              child: Center(
+              child: const Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     CircularProgressIndicator(
                       color: Color(0xFFE85D10),
                       strokeWidth: 3,
@@ -331,12 +331,12 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                       margin: const EdgeInsets.only(right: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3B0764).withOpacity(0.8),
+                        color: const Color(0xFF3B0764).withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFA855F7).withOpacity(0.4)),
+                        border: Border.all(color: const Color(0xFFA855F7).withValues(alpha: 0.4)),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           Icon(Icons.auto_awesome, color: Color(0xFFC084FC), size: 12),
                           SizedBox(width: 4),
                           Text(
@@ -357,12 +357,12 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _showTrace ? const Color(0xFFE85D10) : Colors.black.withOpacity(0.6),
+                        color: _showTrace ? const Color(0xFFE85D10) : Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.white24),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           Icon(Icons.query_stats, color: Colors.white, size: 13),
                           SizedBox(width: 4),
                           Text(
@@ -386,7 +386,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.white24),
                       ),
@@ -409,13 +409,13 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.8),
+                  color: Colors.black.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.white24),
                 ),
-                child: Column(
+                child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'WEBRTC STREAM TRACE',
                       style: TextStyle(

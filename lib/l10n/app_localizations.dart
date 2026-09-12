@@ -1010,11 +1010,179 @@ abstract class AppLocalizations {
   /// **'Session expired. Please log in again.'**
   String get errSessionExpired;
 
+  /// No description provided for @errAppKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Application API key is required. Please scan QR code or enroll .hscfg profile.'**
+  String get errAppKeyRequired;
+
+  /// No description provided for @errAppKeyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Application API key is invalid or has been revoked. Please re-configure.'**
+  String get errAppKeyInvalid;
+
   /// No description provided for @errGeneric.
   ///
   /// In en, this message translates to:
   /// **'An error occurred. Please try again later.'**
   String get errGeneric;
+
+  /// No description provided for @scanQrTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR Code'**
+  String get scanQrTabTitle;
+
+  /// No description provided for @scanQrDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Point your camera at the HubSight configuration QR code provided by your administrator.'**
+  String get scanQrDesc;
+
+  /// No description provided for @scanQrPickImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick QR image from gallery'**
+  String get scanQrPickImage;
+
+  /// No description provided for @scanQrInvalidPayload.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid QR code or not a HubSight configuration format.'**
+  String get scanQrInvalidPayload;
+
+  /// No description provided for @scanQrDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading configuration file...'**
+  String get scanQrDownloading;
+
+  /// No description provided for @scanQrChecksumMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'SHA-256 checksum mismatch on downloaded configuration file.'**
+  String get scanQrChecksumMismatch;
+
+  /// No description provided for @scanQrEnterPinPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 6-digit PIN to unlock configuration'**
+  String get scanQrEnterPinPrompt;
+
+  /// No description provided for @scanQrConfigIdentified.
+  ///
+  /// In en, this message translates to:
+  /// **'Recognized: {name}'**
+  String scanQrConfigIdentified(Object name);
+
+  /// No description provided for @cameraPermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera permission is required to scan QR codes.'**
+  String get cameraPermissionRequired;
+
+  /// No description provided for @tabHscfgFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Config File (.hscfg)'**
+  String get tabHscfgFile;
+
+  /// No description provided for @loginOrDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get loginOrDivider;
+
+  /// No description provided for @loginPasskeyBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Biometrics / Face ID'**
+  String get loginPasskeyBtn;
+
+  /// No description provided for @loginPasskeyBtnFaceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Face ID'**
+  String get loginPasskeyBtnFaceId;
+
+  /// No description provided for @loginPasskeyBtnTouchId.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Touch ID'**
+  String get loginPasskeyBtnTouchId;
+
+  /// No description provided for @loginPasskeyBtnFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Fingerprint'**
+  String get loginPasskeyBtnFingerprint;
+
+  /// No description provided for @loginBiometricPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate with biometrics to sign in to HubSight'**
+  String get loginBiometricPrompt;
+
+  /// No description provided for @loginBiometricNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric login is not configured on this device yet. Please sign in with password first to enable.'**
+  String get loginBiometricNotConfigured;
+
+  /// No description provided for @loginBiometricNotEnrolled.
+  ///
+  /// In en, this message translates to:
+  /// **'No biometrics enrolled on this device. Please set up in device settings.'**
+  String get loginBiometricNotEnrolled;
+
+  /// No description provided for @loginBiometricNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometrics not supported or enrolled on this device.'**
+  String get loginBiometricNotSupported;
+
+  /// No description provided for @loginBiometricFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric authentication failed or was cancelled.'**
+  String get loginBiometricFailed;
+
+  /// No description provided for @biometricEnrollPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Biometric Sign-in?'**
+  String get biometricEnrollPromptTitle;
+
+  /// No description provided for @biometricEnrollPromptDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to use biometrics to quickly sign in to HubSight next time?'**
+  String get biometricEnrollPromptDesc;
+
+  /// No description provided for @biometricEnrollEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Now'**
+  String get biometricEnrollEnable;
+
+  /// No description provided for @biometricEnrollLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get biometricEnrollLater;
+
+  /// No description provided for @biometricSettingsQuickLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Biometric Sign-in'**
+  String get biometricSettingsQuickLogin;
+
+  /// No description provided for @biometricSettingsQuickLoginDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Face ID or Fingerprint to sign in instantly without typing password.'**
+  String get biometricSettingsQuickLoginDesc;
 }
 
 class _AppLocalizationsDelegate

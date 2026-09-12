@@ -6,6 +6,7 @@ import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
 import '../camera/playback_screen.dart';
 import '../common/app_sidebar.dart';
+import '../../core/theme/app_theme.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -96,9 +97,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFFE85D10),
+          backgroundColor: HubSightColors.primary,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
         ),
       );
     });
@@ -133,42 +134,45 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final sdk = ref.watch(hubsightSdkProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: HubSightColors.bgDark,
       drawer: const AppSidebar(activeRoute: 'home'),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: HubSightColors.cardDark,
         elevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        ),
         title: Text(
           l10n.dashboardTitle,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
         ),
         actions: [
           IconButton(
             icon: Icon(
               _isMultiViewMode ? Icons.grid_view : Icons.view_quilt_outlined,
-              color: _isMultiViewMode ? const Color(0xFFE85D10) : const Color(0xFF94A3B8),
+              color: _isMultiViewMode ? HubSightColors.primary : HubSightColors.textSecondary,
             ),
             tooltip: l10n.multiViewTitle,
             onPressed: _cameras.isEmpty ? null : _toggleMultiViewMode,
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
+            icon: const Icon(Icons.refresh, color: HubSightColors.textSecondary),
             onPressed: _loadCamerasAndToken,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE85D10)))
+          ? const Center(child: CircularProgressIndicator(color: HubSightColors.primary))
           : _cameras.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.videocam_off_outlined, size: 48, color: Color(0xFF64748B)),
+                      const Icon(Icons.videocam_off_outlined, size: 48, color: HubSightColors.textMuted),
                       const SizedBox(height: 12),
                       Text(
                         l10n.dashboardNoCameras,
-                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 14),
                       ),
                     ],
                   ),
@@ -186,7 +190,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return const Center(
         child: Text(
           'Không có camera nào đang hoạt động để phát trực tiếp',
-          style: TextStyle(color: Color(0xFF94A3B8)),
+          style: TextStyle(color: HubSightColors.textMuted),
         ),
       );
     }
@@ -210,10 +214,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         final cam = _cameras[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 14),
-          color: const Color(0xFF1E293B),
+          color: HubSightColors.cardDark,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF334155)),
+            borderRadius: HubSightRadius.roundedCard,
+            side: const BorderSide(color: HubSightColors.borderDark),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -235,13 +239,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: cam.isStreaming
-                              ? const Color(0xFF10B981).withOpacity(0.15)
-                              : Colors.redAccent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
+                              ? const Color(0x2610B981)
+                              : HubSightColors.errorBg,
+                          borderRadius: HubSightRadius.roundedXl,
+                          border: Border.all(
+                            color: cam.isStreaming
+                                ? const Color(0x4D10B981)
+                                : HubSightColors.errorBorder,
+                          ),
                         ),
                         child: Icon(
                           Icons.videocam,
-                          color: cam.isStreaming ? const Color(0xFF10B981) : Colors.redAccent,
+                          color: cam.isStreaming ? const Color(0xFF10B981) : HubSightColors.error,
                           size: 18,
                         ),
                       ),
@@ -253,7 +262,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             Text(
                               cam.name,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: HubSightColors.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -261,7 +270,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             Text(
                               cam.host,
                               style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                                color: HubSightColors.textMuted,
                                 fontSize: 11.5,
                               ),
                             ),
@@ -272,14 +281,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: cam.isStreaming
-                              ? const Color(0xFF10B981).withOpacity(0.2)
-                              : const Color(0xFFEF4444).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
+                              ? const Color(0x2610B981)
+                              : HubSightColors.errorBg,
+                          borderRadius: HubSightRadius.roundedXl,
+                          border: Border.all(
+                            color: cam.isStreaming
+                                ? const Color(0x4D10B981)
+                                : HubSightColors.errorBorder,
+                          ),
                         ),
                         child: Text(
                           cam.isStreaming ? l10n.cameraOnline : l10n.cameraStopped,
                           style: TextStyle(
-                            color: cam.isStreaming ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            color: cam.isStreaming ? const Color(0xFF34D399) : HubSightColors.errorText,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
@@ -302,16 +316,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     refreshInterval: const Duration(seconds: 4),
                     fit: BoxFit.cover,
                     stoppedPlaceholder: Container(
-                      color: const Color(0xFF0F172A),
+                      color: HubSightColors.bgDark,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.videocam_off_outlined, color: Color(0xFF64748B), size: 36),
+                            const Icon(Icons.videocam_off_outlined, color: HubSightColors.textMuted, size: 36),
                             const SizedBox(height: 8),
                             Text(
                               l10n.cameraStoppedPlaceholder,
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                              style: const TextStyle(color: HubSightColors.textMuted, fontSize: 12),
                             ),
                           ],
                         ),

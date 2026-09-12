@@ -72,6 +72,28 @@ void main() {
         contains('maintenance'),
       );
 
+      // Test App Key Required & Invalid
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.appKeyRequired, viL10n),
+        contains('API Key'),
+      );
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.appKeyRequired, enL10n),
+        contains('API key'),
+      );
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.appKeyInvalidOrRevoked, viL10n),
+        contains('thu hồi'),
+      );
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.appKeyInvalidOrRevoked, enL10n),
+        contains('revoked'),
+      );
+
       // Test generic exception
       final genericStr =
           AppErrorLocalizer.localize(Exception('Unknown network bug'), enL10n);

@@ -3,6 +3,8 @@ import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/services/fcm_service.dart';
+import '../../core/storage/storage_service.dart';
+import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
@@ -56,36 +58,39 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final currentUser = ref.watch(hubsightSdkProvider)?.auth.currentUser;
+    final appLocale = ref.watch(appLocaleProvider);
 
     return Drawer(
-      backgroundColor: Colors.white,
-      elevation: 16,
+      backgroundColor: HubSightColors.cardDark,
+      elevation: 0,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(right: Radius.circular(0)),
+        borderRadius: BorderRadius.zero,
+        side: BorderSide(color: HubSightColors.borderDark, width: 1.0),
       ),
       child: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 1. Header Bar: Logo, Title, Subtitle, Close Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
               child: Row(
                 children: [
-                  // Orange logo
+                  // Orange Camera Logo Box
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE85D10),
-                      borderRadius: BorderRadius.circular(12),
+                      color: HubSightColors.primary,
+                      borderRadius: HubSightRadius.roundedXl,
                     ),
                     child: const Icon(
-                      Icons.camera_alt_outlined,
+                      Icons.camera_alt_rounded,
                       color: Colors.white,
-                      size: 24,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   // Title and Subtitle
                   Expanded(
                     child: Column(
@@ -94,17 +99,18 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                         const Text(
                           'HubSight',
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: HubSightColors.textPrimary,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           l10n.sidebarSubtitle,
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
+                            fontSize: 10.5,
+                            color: HubSightColors.textMuted,
                           ),
                         ),
                       ],
@@ -112,143 +118,238 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   ),
                   // Close Button
                   IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF64748B), size: 22),
+                    icon: const Icon(Icons.close, color: HubSightColors.textMuted, size: 20),
                     onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 8),
+            // 2. Top User Workspace & Quick Controls (Linear / Slack pattern)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      // User Profile Button
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() => _showUserMenu = !_showUserMenu);
+                          },
+                          borderRadius: HubSightRadius.roundedXl,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.0),
+                            decoration: BoxDecoration(
+                              color: _showUserMenu
+                                  ? HubSightColors.primaryBg
+                                  : HubSightColors.surfaceDark,
+                              borderRadius: HubSightRadius.roundedXl,
+                              border: Border.all(
+                                color: _showUserMenu
+                                    ? HubSightColors.primaryLight
+                                    : HubSightColors.borderDark,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                // User Avatar
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0x33DC2626),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.person_rounded,
+                                    color: Color(0xFFEF4444),
+                                    size: 17,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // Name and Tag
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        currentUser?.fullName.isNotEmpty == true
+                                            ? currentUser!.fullName
+                                            : 'Administrator',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: HubSightColors.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0x33DC2626),
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: const Color(0x66DC2626)),
+                                            ),
+                                            child: Text(
+                                              currentUser?.role.toUpperCase() ?? l10n.adminRole,
+                                              style: const TextStyle(
+                                                fontSize: 8.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFFFCA5A5),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            '@${currentUser?.username ?? "admin"}',
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: HubSightColors.textMuted,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.unfold_more_rounded,
+                                  size: 15,
+                                  color: _showUserMenu
+                                      ? HubSightColors.primary
+                                      : HubSightColors.textMuted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
 
-            // 2. Navigation Menu Items List (Only 1 item: Home/Trang chủ)
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  if (_showUserMenu) {
-                    setState(() => _showUserMenu = false);
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                  children: [
-                    // Home / Trang chủ -> Playback screen (Timeline & Live single)
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.play_circle_outline,
-                      label: l10n.menuHome,
-                      isSelected: widget.activeRoute == 'home',
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (widget.activeRoute != 'home') {
-                          Navigator.pushReplacement(
+                      // Notification Bell Button
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+                            MaterialPageRoute(builder: (_) => const NotificationScreen()),
                           );
-                        }
-                      },
-                    ),
+                        },
+                        borderRadius: HubSightRadius.roundedXl,
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: HubSightColors.surfaceDark,
+                            borderRadius: HubSightRadius.roundedXl,
+                            border: Border.all(color: HubSightColors.borderDark, width: 1.0),
+                          ),
+                          child: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: HubSightColors.textSecondary,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
 
-                    // Dashboard / Lưới Camera -> DashboardScreen
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.grid_view_rounded,
-                      label: l10n.dashboardTitle,
-                      isSelected: widget.activeRoute == 'dashboard',
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (widget.activeRoute != 'dashboard') {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const DashboardScreen()),
-                          );
-                        }
-                      },
+                  // Language Switcher Row Under User
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () {
+                      ref.read(appLocaleProvider.notifier).toggleLocale();
+                    },
+                    borderRadius: HubSightRadius.roundedXl,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: HubSightColors.surfaceDark,
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(color: HubSightColors.borderDark, width: 1.0),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.language_rounded,
+                                  size: 14, color: HubSightColors.textMuted),
+                              const SizedBox(width: 8),
+                              Text(
+                                l10n.menuLanguage,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: HubSightColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            appLocale.languageCode == 'vi'
+                                ? '🇻🇳 Tiếng Việt'
+                                : '🇬🇧 English',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: HubSightColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-
-                    // Notifications / Thông báo -> NotificationScreen
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.notifications_none_rounded,
-                      label: l10n.notificationTitle,
-                      isSelected: widget.activeRoute == 'notifications',
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const NotificationScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
-            // 3. User Floating Menu Popup (Shown above the user card if active)
+            // 3. User Dropdown Popover (when toggled)
             if (_showUserMenu) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    color: HubSightColors.cardDark,
+                    borderRadius: HubSightRadius.roundedCard,
+                    border: Border.all(color: HubSightColors.borderDark, width: 1.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 16,
-                        offset: const Offset(0, -4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header inside popup
-                      Padding(
-                        padding: const EdgeInsets.all(14.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Administrator',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '@admin • ${l10n.adminRole}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
                       // Option 1: Cài đặt thiết bị & Bảo mật
                       ListTile(
                         dense: true,
                         visualDensity: VisualDensity.compact,
                         leading: const Icon(
-                          Icons.shield_outlined,
-                          color: Color(0xFFE85D10),
-                          size: 20,
+                          Icons.tune_rounded,
+                          color: HubSightColors.primary,
+                          size: 18,
                         ),
                         title: Text(
                           l10n.settingsTitle,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF0F172A),
+                            color: HubSightColors.textPrimary,
                           ),
                         ),
                         onTap: () {
@@ -267,15 +368,15 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                         visualDensity: VisualDensity.compact,
                         leading: const Icon(
                           Icons.vpn_key_outlined,
-                          color: Color(0xFF475569),
-                          size: 20,
+                          color: HubSightColors.textSecondary,
+                          size: 18,
                         ),
                         title: Text(
                           l10n.changePasswordTitle,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF0F172A),
+                            color: HubSightColors.textPrimary,
                           ),
                         ),
                         onTap: () {
@@ -284,7 +385,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                         },
                       ),
 
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const Divider(height: 1, color: HubSightColors.borderDark),
 
                       // Option 3: Đăng xuất
                       ListTile(
@@ -292,15 +393,15 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                         visualDensity: VisualDensity.compact,
                         leading: const Icon(
                           Icons.logout_rounded,
-                          color: Color(0xFFDC2626),
-                          size: 20,
+                          color: HubSightColors.error,
+                          size: 18,
                         ),
                         title: Text(
                           l10n.logout,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFFDC2626),
+                            color: HubSightColors.error,
                           ),
                         ),
                         onTap: () {
@@ -312,155 +413,87 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
             ],
 
-            // 4. Language Selector Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const SizedBox(height: 6),
+            const Divider(height: 1, color: HubSightColors.borderDark),
+            const SizedBox(height: 6),
+
+            // 4. Navigation Menu Items List
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 10.0),
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.language, size: 20, color: Color(0xFF64748B)),
-                      const SizedBox(width: 10),
-                      Text(
-                        l10n.menuLanguage,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Language badge pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7ED),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFFEDD5)),
-                    ),
+                  // Section 1: GIÁM SÁT
+                  const Padding(
+                    padding: EdgeInsets.only(left: 10, top: 8, bottom: 4),
                     child: Text(
-                      l10n.languageBadge,
-                      style: const TextStyle(
-                        fontSize: 11.5,
+                      'GIÁM SÁT',
+                      style: TextStyle(
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFE85D10),
+                        color: HubSightColors.textMuted,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  // Xem lại (Playback)
+                  _buildMenuItem(
+                    context: context,
+                    icon: Icons.videocam_outlined,
+                    label: l10n.menuPlayback,
+                    isSelected: widget.activeRoute == 'home',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (widget.activeRoute != 'home') {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+                        );
+                      }
+                    },
+                  ),
 
-            // 5. User Profile Card & Notification Action
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  // User Profile (Clickable -> Opens Popup Menu)
-                  Expanded(
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _showUserMenu = !_showUserMenu;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.0),
-                        decoration: BoxDecoration(
-                          color: _showUserMenu ? const Color(0xFFFFFBF7) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          border: _showUserMenu
-                              ? Border.all(color: const Color(0xFFFED7AA), width: 1.5)
-                              : null,
-                        ),
-                        child: Row(
-                          children: [
-                            // User Avatar
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEE2E2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.person_outline_rounded,
-                                color: Color(0xFFEF4444),
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            // Name and Tag
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    currentUser?.fullName.isNotEmpty == true
-                                        ? currentUser!.fullName
-                                        : 'Administrator',
-                                    style: const TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFEF2F2),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(color: const Color(0xFFFECACA)),
-                                        ),
-                                        child: Text(
-                                          currentUser?.role.toUpperCase() ?? l10n.adminRole,
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFFDC2626),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '@${currentUser?.username ?? "admin"}',
-                                        style: const TextStyle(
-                                          fontSize: 11.5,
-                                          color: Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.unfold_more_rounded,
-                              size: 18,
-                              color: _showUserMenu ? const Color(0xFFE85D10) : const Color(0xFF94A3B8),
-                            ),
-                          ],
-                        ),
+                  // Lưới Camera (MultiView / Dashboard)
+                  _buildMenuItem(
+                    context: context,
+                    icon: Icons.grid_view_rounded,
+                    label: l10n.dashboardTitle,
+                    isSelected: widget.activeRoute == 'dashboard',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (widget.activeRoute != 'dashboard') {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                        );
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Section 2: HỆ THỐNG
+                  const Padding(
+                    padding: EdgeInsets.only(left: 10, top: 8, bottom: 4),
+                    child: Text(
+                      'HỆ THỐNG',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: HubSightColors.textMuted,
+                        letterSpacing: 1.0,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
 
-                  // Notification Bell Button
-                  InkWell(
+                  // Notifications / Thông báo
+                  _buildMenuItem(
+                    context: context,
+                    icon: Icons.notifications_none_rounded,
+                    label: l10n.notificationTitle,
+                    isSelected: widget.activeRoute == 'notifications',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -468,38 +501,37 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                         MaterialPageRoute(builder: (_) => const NotificationScreen()),
                       );
                     },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: Color(0xFF334155),
-                        size: 20,
-                      ),
-                    ),
+                  ),
+
+                  // Settings / Cài đặt
+                  _buildMenuItem(
+                    context: context,
+                    icon: Icons.tune_rounded,
+                    label: l10n.settingsTitle,
+                    isSelected: widget.activeRoute == 'settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      );
+                    },
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 6),
-
-            // 6. Version and Copyright Footer
+            // 5. Version and Copyright Footer
+            const Divider(height: 1, color: HubSightColors.borderDark),
             Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
+              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
               child: Column(
                 children: [
                   Text(
                     l10n.footerVersion,
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      color: HubSightColors.textMuted,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -507,8 +539,8 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                   Text(
                     l10n.footerCopyright,
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      color: HubSightColors.textMuted,
                     ),
                   ),
                 ],
@@ -527,32 +559,38 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE85D10) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? Colors.white : const Color(0xFF475569),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF334155),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: HubSightRadius.roundedXl,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: isSelected ? HubSightColors.primary : Colors.transparent,
+            borderRadius: HubSightRadius.roundedXl,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : HubSightColors.textSecondary,
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.white : HubSightColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

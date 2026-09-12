@@ -7,6 +7,7 @@ import 'core/services/biometric_service.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/in_app_notification_service.dart';
 import 'core/storage/storage_service.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/app_lock_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/camera/playback_screen.dart';
@@ -147,28 +148,25 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
   Widget build(BuildContext context) {
     final maintenanceEx = ref.watch(maintenanceStateProvider);
     final sdk = ref.watch(hubsightSdkProvider);
+    final appLocale = ref.watch(appLocaleProvider);
 
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
       title: 'HubSight CCTV',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE85D10),
-          primary: const Color(0xFFE85D10),
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.darkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('vi'),
+      locale: appLocale,
       home: maintenanceEx != null
           ? const MaintenanceScreen()
           : _isCheckingInitialAuth
               ? const Scaffold(
-                  backgroundColor: Color(0xFF0F172A),
+                  backgroundColor: HubSightColors.bgDark,
                   body: Center(
                     child: CircularProgressIndicator(
-                      color: Color(0xFFE85D10),
+                      color: HubSightColors.primary,
                     ),
                   ),
                 )

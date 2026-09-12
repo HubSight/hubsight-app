@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_models.dart';
@@ -11,6 +12,29 @@ final storageServiceProvider = Provider<StorageService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return StorageService(prefs);
 });
+
+final appLocaleProvider = StateNotifierProvider<AppLocaleNotifier, Locale>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return AppLocaleNotifier(storage);
+});
+
+class AppLocaleNotifier extends StateNotifier<Locale> {
+  final StorageService _storage;
+
+  AppLocaleNotifier(this._storage)
+      : super(Locale(_storage.getLocale() ?? 'vi'));
+
+  Future<void> toggleLocale() async {
+    final nextCode = state.languageCode == 'vi' ? 'en' : 'vi';
+    state = Locale(nextCode);
+    await _storage.setLocale(nextCode);
+  }
+
+  Future<void> setLocale(String code) async {
+    state = Locale(code);
+    await _storage.setLocale(code);
+  }
+}
 
 class StorageService {
   final SharedPreferences _prefs;

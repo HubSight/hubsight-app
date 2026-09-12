@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../core/theme/app_theme.dart';
 
 class ChangePasswordDialog extends ConsumerStatefulWidget {
   final bool isForced;
@@ -107,12 +108,15 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
     return PopScope(
       canPop: !widget.isForced,
       child: Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: HubSightColors.cardDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedCardLg,
+          side: const BorderSide(color: HubSightColors.borderDark, width: 1.0),
+        ),
         insetPadding: const EdgeInsets.symmetric(horizontal: 20),
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,18 +128,18 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7ED),
-                            borderRadius: BorderRadius.circular(12),
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: HubSightColors.primaryBg,
+                            shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.vpn_key_outlined,
-                            color: Color(0xFFE85D10),
-                            size: 24,
+                            color: HubSightColors.primary,
+                            size: 20,
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 10),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -144,9 +148,9 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                                   ? l10n.mustChangePasswordTitle
                                   : l10n.changePasswordTitle,
                               style: const TextStyle(
-                                fontSize: 17,
+                                fontSize: 15,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
+                                color: HubSightColors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -155,8 +159,8 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                                   ? l10n.mustChangePasswordDesc
                                   : l10n.changePasswordSubtitle,
                               style: const TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF64748B),
+                                fontSize: 11,
+                                color: HubSightColors.textMuted,
                               ),
                             ),
                           ],
@@ -165,35 +169,35 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                     ),
                     if (!widget.isForced)
                       IconButton(
-                        icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                        icon: const Icon(Icons.close, color: HubSightColors.textMuted, size: 18),
                         onPressed: () => Navigator.pop(context),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 if (_errorMessage != null) ...[
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                      color: HubSightColors.errorBg,
+                      borderRadius: HubSightRadius.roundedCard,
+                      border: Border.all(color: HubSightColors.errorBorder, width: 1.0),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline,
-                            color: Color(0xFFEF4444), size: 18),
+                        const Icon(Icons.error_outline_rounded,
+                            color: HubSightColors.error, size: 16),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMessage!,
                             style: const TextStyle(
-                              color: Color(0xFFDC2626),
-                              fontSize: 12.5,
+                              color: HubSightColors.errorText,
+                              fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -205,146 +209,93 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
 
                 // 1. Current Password
                 Text(
-                  l10n.currentPassword,
+                  l10n.currentPassword.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: HubSightColors.textSecondary,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _oldPasswordController,
                   obscureText: _obscureOld,
+                  style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 13.5),
                   decoration: InputDecoration(
                     hintText: l10n.currentPasswordPlaceholder,
-                    hintStyle:
-                        const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: Color(0xFFE85D10), width: 1.5),
-                    ),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 17),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureOld ? Icons.visibility_off : Icons.visibility,
-                        color: const Color(0xFF94A3B8),
-                        size: 20,
+                        _obscureOld ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: HubSightColors.textMuted,
+                        size: 17,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureOld = !_obscureOld),
+                      onPressed: () => setState(() => _obscureOld = !_obscureOld),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // 2. New Password
                 Text(
-                  l10n.newPassword,
+                  l10n.newPassword.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: HubSightColors.textSecondary,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _newPasswordController,
                   obscureText: _obscureNew,
+                  style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 13.5),
                   decoration: InputDecoration(
                     hintText: l10n.newPasswordPlaceholder,
-                    hintStyle:
-                        const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: Color(0xFFE85D10), width: 1.5),
-                    ),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 17),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureNew ? Icons.visibility_off : Icons.visibility,
-                        color: const Color(0xFF94A3B8),
-                        size: 20,
+                        _obscureNew ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: HubSightColors.textMuted,
+                        size: 17,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureNew = !_obscureNew),
+                      onPressed: () => setState(() => _obscureNew = !_obscureNew),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // 3. Confirm New Password
                 Text(
-                  l10n.confirmNewPassword,
+                  l10n.confirmNewPassword.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: HubSightColors.textSecondary,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirm,
+                  style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 13.5),
                   decoration: InputDecoration(
                     hintText: l10n.confirmNewPasswordPlaceholder,
-                    hintStyle:
-                        const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: Color(0xFFE85D10), width: 1.5),
-                    ),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 17),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirm
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        color: const Color(0xFF94A3B8),
-                        size: 20,
+                        _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        color: HubSightColors.textMuted,
+                        size: 17,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Action Buttons
                 Row(
@@ -354,40 +305,38 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                            backgroundColor: HubSightColors.surfaceDark,
+                            side: const BorderSide(color: HubSightColors.borderDark),
+                            shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           child: Text(
                             l10n.cancel,
                             style: const TextStyle(
-                              color: Color(0xFF64748B),
+                              color: HubSightColors.textSecondary,
                               fontWeight: FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                     ],
                     Expanded(
                       flex: widget.isForced ? 1 : 2,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : () => _handleSubmit(l10n),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE85D10),
+                          backgroundColor: HubSightColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,
                         ),
                         child: _isLoading
                             ? const SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 18,
+                                height: 18,
                                 child: CircularProgressIndicator(
                                   color: Colors.white,
                                   strokeWidth: 2,
@@ -396,7 +345,7 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                             : Text(
                                 l10n.savePassword,
                                 style: const TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

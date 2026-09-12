@@ -10,6 +10,7 @@ import '../../core/services/fcm_service.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
 import '../config/server_config_screen.dart';
+import '../../core/theme/app_theme.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -98,18 +99,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.revokeSession, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text(l10n.confirmRevokeSession),
+        backgroundColor: HubSightColors.cardDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedCard,
+          side: const BorderSide(color: HubSightColors.borderDark),
+        ),
+        title: Text(l10n.revokeSession, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: HubSightColors.textPrimary)),
+        content: Text(l10n.confirmRevokeSession, style: const TextStyle(color: HubSightColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel, style: const TextStyle(color: Color(0xFF64748B))),
+            child: Text(l10n.cancel, style: const TextStyle(color: HubSightColors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: HubSightColors.error,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
             ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(l10n.revokeSession),
@@ -189,25 +195,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final sdk = ref.watch(hubsightSdkProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: HubSightColors.bgDark,
       appBar: AppBar(
         title: Text(
           l10n.settingsTitle,
           style: const TextStyle(
             fontSize: 16.5,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
+            color: HubSightColors.textPrimary,
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: HubSightColors.cardDark,
+        elevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          icon: const Icon(Icons.arrow_back, color: HubSightColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Color(0xFFDC2626)),
+            icon: const Icon(Icons.logout, color: HubSightColors.error),
             tooltip: l10n.logout,
             onPressed: _handleLogout,
           ),
@@ -247,23 +256,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: _isLoadingProfile
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE85D10)))
+          ? const Center(child: CircularProgressIndicator(color: HubSightColors.primary))
           : Row(
               children: [
                 Container(
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFFFEDD5)),
+                    color: HubSightColors.surfaceDark,
+                    borderRadius: HubSightRadius.roundedLg,
+                    border: Border.all(color: HubSightColors.borderDark),
                   ),
-                  child: const Icon(Icons.person, color: Color(0xFFE85D10), size: 28),
+                  child: const Icon(Icons.person, color: HubSightColors.primary, size: 28),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -275,13 +284,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: HubSightColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '@${_profile?.username ?? "admin"} • ${_profile?.role.toUpperCase() ?? "ADMIN"}',
-                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                        style: const TextStyle(fontSize: 12.5, color: HubSightColors.textMuted),
                       ),
                     ],
                   ),
@@ -293,10 +302,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       builder: (_) => const ChangePasswordDialog(),
                     );
                   },
-                  icon: const Icon(Icons.key, size: 16, color: Color(0xFFE85D10)),
+                  icon: const Icon(Icons.key, size: 16, color: HubSightColors.primary),
                   label: Text(
                     l10n.changePasswordTitle,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFE85D10), fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 12, color: HubSightColors.primary, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -308,9 +317,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,20 +329,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.devices, color: Color(0xFFE85D10), size: 20),
+                  const Icon(Icons.devices, color: HubSightColors.primary, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     l10n.sessionsTitle,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: HubSightColors.textPrimary,
                     ),
                   ),
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF64748B)),
+                icon: const Icon(Icons.refresh, size: 18, color: HubSightColors.textMuted),
                 onPressed: _fetchSessions,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -343,21 +352,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 4),
           Text(
             l10n.sessionsSubtitle,
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+            style: const TextStyle(fontSize: 11.5, color: HubSightColors.textMuted),
           ),
           const SizedBox(height: 14),
 
           if (_isLoadingSessions)
             const Center(child: Padding(
               padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(color: Color(0xFFE85D10)),
+              child: CircularProgressIndicator(color: HubSightColors.primary),
             ))
           else if (_sessions.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Không có phiên nào khác đang hoạt động',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                style: TextStyle(color: HubSightColors.textMuted, fontSize: 12),
               ),
             )
           else
@@ -365,7 +374,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _sessions.length,
-              separatorBuilder: (_, __) => const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              separatorBuilder: (_, __) => const Divider(height: 16, color: HubSightColors.borderDark),
               itemBuilder: (context, index) {
                 final s = _sessions[index];
                 return Row(
@@ -374,7 +383,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       s.clientType?.contains('mobile') == true
                           ? Icons.phone_iphone
                           : Icons.laptop,
-                      color: s.isCurrent ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      color: s.isCurrent ? const Color(0xFF10B981) : HubSightColors.textMuted,
                       size: 22,
                     ),
                     const SizedBox(width: 12),
@@ -390,7 +399,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
+                                    color: HubSightColors.textPrimary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -400,8 +409,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withOpacity(0.15),
+                                    color: const Color(0x2610B981),
                                     borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0x4D10B981)),
                                   ),
                                   child: Text(
                                     l10n.currentSession,
@@ -418,7 +428,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 2),
                           Text(
                             'IP: ${s.ipAddress ?? "Unknown"} • ${s.geoCity ?? "Local"}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
                           ),
                         ],
                       ),
@@ -427,7 +437,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       TextButton(
                         onPressed: () => _handleRevokeSession(s, l10n),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFDC2626),
+                          foregroundColor: HubSightColors.error,
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         ),
                         child: Text(l10n.revokeSession, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
@@ -445,23 +455,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
-              Icon(Icons.shield_outlined, color: Color(0xFFE85D10), size: 20),
+          const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: HubSightColors.primary, size: 20),
               SizedBox(width: 8),
               Text(
                 'Bảo mật Ứng dụng',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: HubSightColors.textPrimary,
                 ),
               ),
             ],
@@ -477,22 +487,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ref.read(biometricServiceProvider).setAppLockEnabled(v);
             },
           ),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+          const Divider(height: 20, color: HubSightColors.borderDark),
 
           _buildSwitchRow(
             title: l10n.biometricUnlock,
             subtitle: l10n.biometricUnlockDesc,
             value: _biometricUnlock,
-            onChanged: (v) {
-              setState(() => _biometricUnlock = v);
-              ref.read(biometricServiceProvider).setBiometricEnabled(v);
+            onChanged: (v) async {
+              final bio = ref.read(biometricServiceProvider);
+              if (v) {
+                final canCheck = await bio.canAuthenticateWithBiometrics();
+                if (!canCheck) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.loginBiometricNotSupported)),
+                    );
+                  }
+                  return;
+                }
+                final ok = await bio.authenticate(localizedReason: l10n.loginBiometricPrompt);
+                if (!ok) return;
+                setState(() => _biometricUnlock = true);
+                await bio.setBiometricEnabled(true);
+              } else {
+                setState(() => _biometricUnlock = false);
+                await bio.clearBiometricCredentials();
+              }
             },
           ),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+          const Divider(height: 20, color: HubSightColors.borderDark),
 
           Text(
             l10n.lockTimeoutTitle,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
           ),
           const SizedBox(height: 8),
           Row(
@@ -543,23 +570,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.notifications_none, color: Color(0xFFE85D10), size: 20),
+              const Icon(Icons.notifications_none, color: HubSightColors.primary, size: 20),
               const SizedBox(width: 8),
               Text(
                 l10n.pushSettingsTitle,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: HubSightColors.textPrimary,
                 ),
               ),
             ],
@@ -575,7 +602,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _syncPushPreferences();
             },
           ),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+          const Divider(height: 20, color: HubSightColors.borderDark),
 
           _buildSwitchRow(
             title: l10n.pushStranger,
@@ -586,7 +613,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _syncPushPreferences();
             },
           ),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+          const Divider(height: 20, color: HubSightColors.borderDark),
 
           _buildSwitchRow(
             title: l10n.pushSystem,
@@ -606,9 +633,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -618,14 +645,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.dns_rounded, color: Color(0xFFE85D10), size: 20),
+                  const Icon(Icons.dns_rounded, color: HubSightColors.primary, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     l10n.serverConfigTitle,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: HubSightColors.textPrimary,
                     ),
                   ),
                 ],
@@ -644,7 +671,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFE85D10),
+                    color: HubSightColors.primary,
                   ),
                 ),
               ),
@@ -653,13 +680,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 6),
           Text(
             sdk?.config.urls.gatewayUrl ?? 'Chưa cấu hình',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            style: const TextStyle(fontSize: 12, color: HubSightColors.textSecondary),
           ),
           if (sdk != null) ...[
             const SizedBox(height: 2),
             Text(
               'Profile: ${sdk.config.metadata.name}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
             ),
           ],
         ],
@@ -681,12 +708,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
               ),
             ],
           ),
@@ -694,7 +721,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SizedBox(width: 8),
         CupertinoSwitch(
           value: value,
-          activeTrackColor: const Color(0xFFE85D10),
+          activeTrackColor: HubSightColors.primary,
           onChanged: onChanged,
         ),
       ],
@@ -709,20 +736,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: HubSightRadius.roundedXl,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE85D10) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
+          color: isSelected ? HubSightColors.primary : HubSightColors.surfaceDark,
+          borderRadius: HubSightRadius.roundedXl,
+          border: Border.all(
+            color: isSelected ? HubSightColors.primary : HubSightColors.borderDark,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 11.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.white : const Color(0xFF475569),
+            color: isSelected ? Colors.white : HubSightColors.textSecondary,
           ),
         ),
       ),

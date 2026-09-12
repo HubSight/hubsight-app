@@ -44,6 +44,11 @@ class AppErrorLocalizer {
       case HubSightErrorCode.systemMaintenance:
         return l10n.maintenanceMessage;
 
+      case HubSightErrorCode.appKeyRequired:
+        return l10n.errAppKeyRequired;
+      case HubSightErrorCode.appKeyInvalidOrRevoked:
+        return l10n.errAppKeyInvalid;
+
       default:
         return l10n.errGeneric;
     }

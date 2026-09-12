@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/storage/storage_service.dart';
+import '../../core/theme/app_theme.dart';
 import 'login_screen.dart';
 
 class AppLockScreen extends ConsumerStatefulWidget {
@@ -150,7 +151,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Dark Slate
+      backgroundColor: HubSightColors.bgDark,
       body: SafeArea(
         child: Column(
           children: [
@@ -160,13 +161,13 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: HubSightColors.cardDark,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF334155), width: 1.5),
+                border: Border.all(color: HubSightColors.borderDark, width: 1.0),
               ),
               child: const Icon(
                 Icons.lock_outline_rounded,
-                color: Color(0xFFE85D10),
+                color: HubSightColors.primary,
                 size: 36,
               ),
             ),
@@ -174,7 +175,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
             Text(
               titleText,
               style: const TextStyle(
-                color: Colors.white,
+                color: HubSightColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -183,7 +184,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
             const Text(
               'HubSight Surveillance Security',
               style: TextStyle(
-                color: Color(0xFF94A3B8),
+                color: HubSightColors.textMuted,
                 fontSize: 12.5,
               ),
             ),
@@ -281,7 +282,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
                 child: const Text(
                   'Đăng xuất khỏi tài khoản',
                   style: TextStyle(
-                    color: Color(0xFF94A3B8),
+                    color: HubSightColors.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -292,7 +293,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
                 onPressed: () => Navigator.pop(context),
                 child: const Text(
                   'Hủy bỏ',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  style: TextStyle(color: HubSightColors.textMuted, fontSize: 13),
                 ),
               ),
 
@@ -318,15 +319,15 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
         width: 72,
         height: 72,
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
+          color: HubSightColors.surfaceDark,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF334155)),
+          border: Border.all(color: HubSightColors.borderDark, width: 1.0),
         ),
         child: Center(
           child: Text(
             digit,
             style: const TextStyle(
-              color: Colors.white,
+              color: HubSightColors.textPrimary,
               fontSize: 26,
               fontWeight: FontWeight.w600,
             ),
@@ -352,7 +353,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
         child: Center(
           child: Icon(
             icon,
-            color: const Color(0xFFE85D10),
+            color: HubSightColors.primary,
             size: 30,
           ),
         ),

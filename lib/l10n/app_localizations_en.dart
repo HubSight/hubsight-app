@@ -517,5 +517,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errSessionExpired => 'Session expired. Please log in again.';
 
   @override
+  String get errAppKeyRequired =>
+      'Application API key is required. Please scan QR code or enroll .hscfg profile.';
+
+  @override
+  String get errAppKeyInvalid =>
+      'Application API key is invalid or has been revoked. Please re-configure.';
+
+  @override
   String get errGeneric => 'An error occurred. Please try again later.';
+
+  @override
+  String get scanQrTabTitle => 'Scan QR Code';
+
+  @override
+  String get scanQrDesc =>
+      'Point your camera at the HubSight configuration QR code provided by your administrator.';
+
+  @override
+  String get scanQrPickImage => 'Pick QR image from gallery';
+
+  @override
+  String get scanQrInvalidPayload =>
+      'Invalid QR code or not a HubSight configuration format.';
+
+  @override
+  String get scanQrDownloading => 'Downloading configuration file...';
+
+  @override
+  String get scanQrChecksumMismatch =>
+      'SHA-256 checksum mismatch on downloaded configuration file.';
+
+  @override
+  String get scanQrEnterPinPrompt =>
+      'Enter 6-digit PIN to unlock configuration';
+
+  @override
+  String scanQrConfigIdentified(Object name) {
+    return 'Recognized: $name';
+  }
+
+  @override
+  String get cameraPermissionRequired =>
+      'Camera permission is required to scan QR codes.';
+
+  @override
+  String get tabHscfgFile => 'Config File (.hscfg)';
+
+  @override
+  String get loginOrDivider => 'OR';
+
+  @override
+  String get loginPasskeyBtn => 'Sign in with Biometrics / Face ID';
+
+  @override
+  String get loginPasskeyBtnFaceId => 'Sign in with Face ID';
+
+  @override
+  String get loginPasskeyBtnTouchId => 'Sign in with Touch ID';
+
+  @override
+  String get loginPasskeyBtnFingerprint => 'Sign in with Fingerprint';
+
+  @override
+  String get loginBiometricPrompt =>
+      'Authenticate with biometrics to sign in to HubSight';
+
+  @override
+  String get loginBiometricNotConfigured =>
+      'Biometric login is not configured on this device yet. Please sign in with password first to enable.';
+
+  @override
+  String get loginBiometricNotEnrolled =>
+      'No biometrics enrolled on this device. Please set up in device settings.';
+
+  @override
+  String get loginBiometricNotSupported =>
+      'Biometrics not supported or enrolled on this device.';
+
+  @override
+  String get loginBiometricFailed =>
+      'Biometric authentication failed or was cancelled.';
+
+  @override
+  String get biometricEnrollPromptTitle => 'Enable Biometric Sign-in?';
+
+  @override
+  String get biometricEnrollPromptDesc =>
+      'Would you like to use biometrics to quickly sign in to HubSight next time?';
+
+  @override
+  String get biometricEnrollEnable => 'Enable Now';
+
+  @override
+  String get biometricEnrollLater => 'Later';
+
+  @override
+  String get biometricSettingsQuickLogin => 'Quick Biometric Sign-in';
+
+  @override
+  String get biometricSettingsQuickLoginDesc =>
+      'Use Face ID or Fingerprint to sign in instantly without typing password.';
 }

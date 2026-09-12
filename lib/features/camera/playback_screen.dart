@@ -9,6 +9,7 @@ import 'models/camera_models.dart';
 import 'webrtc_viewer.dart';
 import '../notifications/notification_screen.dart';
 import '../common/app_sidebar.dart';
+import '../../core/theme/app_theme.dart';
 
 class PlaybackScreen extends ConsumerStatefulWidget {
   const PlaybackScreen({super.key});
@@ -68,9 +69,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 Expanded(child: Text('Cảnh báo AI: ${event.eventType} tại camera ${event.cameraId}')),
               ],
             ),
-            backgroundColor: const Color(0xFFE85D10),
+            backgroundColor: HubSightColors.primary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
           ),
         );
       });
@@ -344,13 +345,16 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: HubSightColors.bgDark,
       drawer: const AppSidebar(activeRoute: 'home'),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: HubSightColors.cardDark,
         elevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.menu_rounded, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.menu_rounded, color: HubSightColors.textPrimary),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         title: Row(
@@ -358,8 +362,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE85D10),
-                borderRadius: BorderRadius.circular(8),
+                color: HubSightColors.primary,
+                borderRadius: HubSightRadius.roundedXl,
               ),
               child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
             ),
@@ -369,14 +373,14 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: HubSightColors.textPrimary,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B)),
+            icon: const Icon(Icons.notifications_none_rounded, color: HubSightColors.textSecondary),
             onPressed: () {
               Navigator.push(
                 context,
@@ -393,7 +397,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           await _fetchAvailableDays();
           await _fetchTimeline();
         },
-        color: const Color(0xFFE85D10),
+        color: HubSightColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -453,11 +457,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           color: const Color(0xFFDC2626),
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
-                            BoxShadow(color: Colors.red.withOpacity(0.4), blurRadius: 8),
+                            BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 8),
                           ],
                         ),
-                        child: Row(
-                          children: const [
+                        child: const Row(
+                          children: [
                             Icon(Icons.circle, color: Colors.white, size: 8),
                             SizedBox(width: 6),
                             Text(
@@ -490,18 +494,18 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       children: [
         // Simulated video frame / poster
         Container(
-          color: const Color(0xFF020617),
+          color: HubSightColors.bgDark,
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.videocam_rounded, size: 54, color: Color(0xFFE85D10)),
+                const Icon(Icons.videocam_rounded, size: 54, color: HubSightColors.primary),
                 const SizedBox(height: 8),
                 Text(
                   _activeRecording != null
-                      ? '${_activeRecording!.startAt.replaceAll("T", " ")}'
+                      ? _activeRecording!.startAt.replaceAll("T", " ")
                       : l10n.playingArchive,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                  style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 12.5),
                 ),
               ],
             ),
@@ -529,14 +533,14 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    color: HubSightColors.surfaceDark,
+                    borderRadius: HubSightRadius.roundedXl,
+                    border: Border.all(color: HubSightColors.borderDark),
                   ),
                   child: Text(
                     _activeRecording?.startAt.split('T').last.split('.').first ?? '00:00:00',
                     style: const TextStyle(
-                      color: Color(0xFFFBBF24),
+                      color: HubSightColors.primaryLight,
                       fontSize: 11,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
@@ -548,12 +552,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 ElevatedButton.icon(
                   onPressed: _handleGoLive,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE85D10),
+                    backgroundColor: HubSightColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
                   ),
                   icon: const Icon(Icons.radio_button_checked, size: 13),
                   label: const Text('Trực tiếp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
@@ -586,9 +590,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     trackHeight: 3,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                     overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                    activeTrackColor: const Color(0xFFE85D10),
+                    activeTrackColor: HubSightColors.primary,
                     inactiveTrackColor: Colors.white24,
-                    thumbColor: const Color(0xFFE85D10),
+                    thumbColor: HubSightColors.primary,
                   ),
                   child: Slider(
                     value: progress,
@@ -652,19 +656,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           value: rate,
                           child: Text('${rate}x', style: TextStyle(
                             fontWeight: _playbackSpeed == rate ? FontWeight.bold : FontWeight.normal,
-                            color: _playbackSpeed == rate ? const Color(0xFFE85D10) : Colors.black87,
+                            color: _playbackSpeed == rate ? HubSightColors.primary : HubSightColors.textPrimary,
                           )),
                         );
                       }).toList(),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(6),
+                          color: HubSightColors.surfaceDark,
+                          borderRadius: HubSightRadius.roundedXl,
+                          border: Border.all(color: HubSightColors.borderDark),
                         ),
                         child: Text(
                           '${_playbackSpeed}x',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -691,13 +696,13 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF334155)),
+                color: HubSightColors.surfaceDark,
+                borderRadius: HubSightRadius.roundedCard,
+                border: Border.all(color: HubSightColors.borderDark),
               ),
               child: const Icon(
                 Icons.videocam_off_outlined,
-                color: Color(0xFF94A3B8),
+                color: HubSightColors.textSecondary,
                 size: 28,
               ),
             ),
@@ -705,7 +710,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             Text(
               l10n.cameraStoppedStatus,
               style: const TextStyle(
-                color: Color(0xFF64748B),
+                color: HubSightColors.textMuted,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -715,7 +720,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             Text(
               l10n.cameraStoppedTitle(camName),
               style: const TextStyle(
-                color: Colors.white,
+                color: HubSightColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -724,7 +729,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             Text(
               l10n.cameraStoppedDesc,
               style: const TextStyle(
-                color: Color(0xFF94A3B8),
+                color: HubSightColors.textSecondary,
                 fontSize: 11.5,
                 height: 1.3,
               ),
@@ -742,15 +747,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         children: [
@@ -765,19 +764,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B),
+                        color: HubSightColors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
                         onTap: () => _showCameraPicker(l10n),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: HubSightRadius.roundedXl,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
+                            color: HubSightColors.surfaceDark,
+                            borderRadius: HubSightRadius.roundedXl,
+                            border: Border.all(color: HubSightColors.borderDark),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -788,12 +788,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1E293B),
+                                    color: HubSightColors.textPrimary,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
+                              const Icon(Icons.keyboard_arrow_down, size: 18, color: HubSightColors.textSecondary),
                             ],
                           ),
                         ),
@@ -814,19 +814,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B),
+                        color: HubSightColors.textSecondary,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: InkWell(
                         onTap: () => _showDatePicker(),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: HubSightRadius.roundedXl,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
+                            color: HubSightColors.surfaceDark,
+                            borderRadius: HubSightRadius.roundedXl,
+                            border: Border.all(color: HubSightColors.borderDark),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -836,10 +837,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1E293B),
+                                  color: HubSightColors.textPrimary,
                                 ),
                               ),
-                              const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
+                              const Icon(Icons.keyboard_arrow_down, size: 18, color: HubSightColors.textSecondary),
                             ],
                           ),
                         ),
@@ -852,7 +853,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           ),
 
           const SizedBox(height: 10),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: HubSightColors.borderDark),
           const SizedBox(height: 10),
 
           // Recordings Summary Count
@@ -863,7 +864,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF64748B),
+                  color: HubSightColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 6),
@@ -875,7 +876,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         : l10n.recordsCount(_recordings.length)),
                 style: const TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF94A3B8),
+                  color: HubSightColors.textMuted,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -889,8 +890,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   void _showCameraPicker(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: HubSightColors.cardDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: HubSightRadius.roundedSheet,
+        side: BorderSide(color: HubSightColors.borderDark),
+      ),
       builder: (context) {
         return SafeArea(
           child: Column(
@@ -900,17 +904,17 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   l10n.selectCamera,
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
                 ),
               ),
-              const Divider(height: 1),
+              const Divider(height: 1, color: HubSightColors.borderDark),
               Flexible(
                 child: _isLoadingCameras
                     ? const Padding(
                         padding: EdgeInsets.all(24.0),
                         child: Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFFE85D10),
+                            color: HubSightColors.primary,
                           ),
                         ),
                       )
@@ -926,17 +930,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   ? Icons.videocam_off_outlined
                                   : Icons.videocam_outlined,
                               color: isSelected
-                                  ? const Color(0xFFE85D10)
-                                  : Colors.grey,
+                                  ? HubSightColors.primary
+                                  : HubSightColors.textMuted,
                             ),
                             title: Text(cam.name,
                                 style: TextStyle(
                                     fontWeight: isSelected
                                         ? FontWeight.bold
-                                        : FontWeight.normal)),
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? HubSightColors.primary
+                                        : HubSightColors.textPrimary)),
                             trailing: isSelected
                                 ? const Icon(Icons.check,
-                                    color: Color(0xFFE85D10))
+                                    color: HubSightColors.primary)
                                 : null,
                             onTap: () {
                               Navigator.pop(context);
@@ -965,8 +972,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       },
       builder: (context, child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFFE85D10)),
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: HubSightColors.primary,
+              surface: HubSightColors.cardDark,
+              onSurface: HubSightColors.textPrimary,
+            ),
           ),
           child: child!,
         );
@@ -986,9 +997,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A), // Dark Slate
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1000,11 +1011,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF27190F),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF5E3211)),
+                  color: HubSightColors.surfaceDark,
+                  borderRadius: HubSightRadius.roundedXl,
+                  border: Border.all(color: HubSightColors.borderDark),
                 ),
-                child: const Icon(Icons.auto_awesome, color: Color(0xFFF97316), size: 20),
+                child: const Icon(Icons.auto_awesome, color: HubSightColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1016,7 +1027,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: HubSightColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1043,9 +1054,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               Container(
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF020617),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  color: HubSightColors.bgDark,
+                  borderRadius: HubSightRadius.roundedXl,
+                  border: Border.all(color: HubSightColors.borderDark),
                 ),
                 child: Row(
                   children: [
@@ -1060,23 +1071,24 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               // Live Action Button
               InkWell(
                 onTap: _handleGoLive,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: HubSightRadius.roundedXl,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _mode == 'live' ? const Color(0xFFE85D10) : const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(10),
+                    color: _mode == 'live' ? HubSightColors.primary : HubSightColors.surfaceDark,
+                    borderRadius: HubSightRadius.roundedXl,
+                    border: Border.all(color: _mode == 'live' ? HubSightColors.primary : HubSightColors.borderDark),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.radio_button_checked, size: 12, color: _mode == 'live' ? Colors.white : const Color(0xFF94A3B8)),
+                      Icon(Icons.radio_button_checked, size: 12, color: _mode == 'live' ? Colors.white : HubSightColors.textMuted),
                       const SizedBox(width: 4),
                       Text(
                         'Live',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: _mode == 'live' ? Colors.white : const Color(0xFF94A3B8),
+                          color: _mode == 'live' ? Colors.white : HubSightColors.textMuted,
                         ),
                       ),
                     ],
@@ -1091,14 +1103,14 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           // 24h Timeline Bar
           Column(
             children: [
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                  Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                  Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                  Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
-                  Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF94A3B8))),
+                children: [
+                  Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
+                  Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
+                  Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
+                  Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
+                  Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
                 ],
               ),
               const SizedBox(height: 6),
@@ -1106,49 +1118,51 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 height: 32,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF020617),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  color: HubSightColors.bgDark,
+                  borderRadius: HubSightRadius.roundedXl,
+                  border: Border.all(color: HubSightColors.borderDark),
                 ),
                 child: Stack(
                   children: [
-                    ..._filteredRecordings.map((rec) {
-                      final start = DateTime.tryParse(rec.startAt) ?? DateTime.now();
-                      final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
-                      final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.95);
-                      final isSelected = _activeRecording?.id == rec.id;
+                    for (final rec in _filteredRecordings) ...[
+                      () {
+                        final start = DateTime.tryParse(rec.startAt) ?? DateTime.now();
+                        final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
+                        final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.95);
+                        final isSelected = _activeRecording?.id == rec.id;
 
-                      Color markerColor;
-                      switch (rec.eventType) {
-                        case 'danger':
-                          markerColor = const Color(0xFFF43F5E);
-                          break;
-                        case 'fall':
-                          markerColor = const Color(0xFFF59E0B);
-                          break;
-                        case 'stranger':
-                          markerColor = const Color(0xFFFB923C);
-                          break;
-                        default:
-                          markerColor = const Color(0xFF38BDF8);
-                      }
+                        Color markerColor;
+                        switch (rec.eventType) {
+                          case 'danger':
+                            markerColor = const Color(0xFFF43F5E);
+                            break;
+                          case 'fall':
+                            markerColor = const Color(0xFFF59E0B);
+                            break;
+                          case 'stranger':
+                            markerColor = const Color(0xFFFB923C);
+                            break;
+                          default:
+                            markerColor = const Color(0xFF38BDF8);
+                        }
 
-                      return Positioned(
-                        left: leftRatio * 300,
-                        top: 3,
-                        bottom: 3,
-                        child: GestureDetector(
-                          onTap: () => _onSelectRecording(rec),
-                          child: Container(
-                            width: 6,
-                            decoration: BoxDecoration(
-                              color: isSelected ? Colors.white : markerColor,
-                              borderRadius: BorderRadius.circular(3),
+                        return Positioned(
+                          left: leftRatio * 300,
+                          top: 3,
+                          bottom: 3,
+                          child: GestureDetector(
+                            onTap: () => _onSelectRecording(rec),
+                            child: Container(
+                              width: 6,
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.white : markerColor,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }(),
+                    ],
                   ],
                 ),
               ),
@@ -1159,7 +1173,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
           // Recordings Clips Grid / List
           if (_filteredRecordings.isNotEmpty) ...[
-            const Divider(color: Color(0xFF1E293B)),
+            const Divider(color: HubSightColors.borderDark),
             const SizedBox(height: 8),
             ListView.builder(
               shrinkWrap: true,
@@ -1172,15 +1186,15 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
                 return InkWell(
                   onTap: () => _onSelectRecording(rec),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: HubSightRadius.roundedXl,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF1E293B) : const Color(0xFF0B132B),
-                      borderRadius: BorderRadius.circular(10),
+                      color: isSelected ? HubSightColors.surfaceElevated : HubSightColors.surfaceDark,
+                      borderRadius: HubSightRadius.roundedXl,
                       border: Border.all(
-                        color: isSelected ? const Color(0xFFE85D10) : const Color(0xFF1E293B),
+                        color: isSelected ? HubSightColors.primary : HubSightColors.borderDark,
                       ),
                     ),
                     child: Row(
@@ -1188,12 +1202,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF020617),
-                            borderRadius: BorderRadius.circular(8),
+                            color: HubSightColors.bgDark,
+                            borderRadius: HubSightRadius.roundedXl,
                           ),
                           child: Icon(
                             isSelected ? Icons.play_arrow_rounded : Icons.videocam_outlined,
-                            color: const Color(0xFFE85D10),
+                            color: HubSightColors.primary,
                             size: 20,
                           ),
                         ),
@@ -1207,19 +1221,19 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: isSelected ? const Color(0xFFF97316) : Colors.white,
+                                  color: isSelected ? HubSightColors.primaryLight : HubSightColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '${rec.startAt.replaceAll("T", " ")} (${duration}s)',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
                               ),
                             ],
                           ),
                         ),
                         if (isSelected)
-                          const Icon(Icons.graphic_eq_rounded, color: Color(0xFFE85D10), size: 20),
+                          const Icon(Icons.graphic_eq_rounded, color: HubSightColors.primary, size: 20),
                       ],
                     ),
                   ),
@@ -1238,15 +1252,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: HubSightColors.cardDark,
+        borderRadius: HubSightRadius.roundedCard,
+        border: Border.all(color: HubSightColors.borderDark),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1254,30 +1262,30 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.face_retouching_natural_rounded, color: Color(0xFFE85D10), size: 20),
+              const Row(
+                children: [
+                  Icon(Icons.face_retouching_natural_rounded, color: HubSightColors.primary, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Nhật ký nhận diện khuôn mặt',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
                   ),
                 ],
               ),
               Text(
                 '${_recognitionLogs.length} sự kiện',
-                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                style: const TextStyle(fontSize: 11.5, color: HubSightColors.textMuted),
               ),
             ],
           ),
           const SizedBox(height: 12),
           if (_isLoadingLogs)
-            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE85D10))))
+            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary)))
           else if (_recognitionLogs.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12.0),
               child: Center(
-                child: Text('Chưa có dữ liệu nhận diện khuôn mặt', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                child: Text('Chưa có dữ liệu nhận diện khuôn mặt', style: TextStyle(color: HubSightColors.textMuted, fontSize: 12)),
               ),
             )
           else
@@ -1291,22 +1299,22 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFF1F5F9),
+                    backgroundColor: HubSightColors.surfaceDark,
                     backgroundImage: log.thumbnailUrl != null ? NetworkImage(log.thumbnailUrl!) : null,
-                    child: log.thumbnailUrl == null ? const Icon(Icons.person, color: Color(0xFF64748B), size: 18) : null,
+                    child: log.thumbnailUrl == null ? const Icon(Icons.person, color: HubSightColors.textSecondary, size: 18) : null,
                   ),
-                  title: Text(log.memberName ?? 'Người lạ', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
-                  subtitle: Text(log.createdAt, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                  title: Text(log.memberName ?? 'Người lạ', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary)),
+                  subtitle: Text(log.createdAt, style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted)),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      color: const Color(0x2610B981),
+                      borderRadius: HubSightRadius.roundedXl,
+                      border: Border.all(color: const Color(0x4D10B981)),
                     ),
                     child: Text(
                       '${(log.confidence * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
                     ),
                   ),
                 );
@@ -1321,20 +1329,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     final isSelected = _filterPeriod == key;
     return InkWell(
       onTap: () => setState(() => _filterPeriod = key),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: HubSightRadius.roundedXl,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: isSelected ? Border.all(color: const Color(0xFF334155)) : null,
+          color: isSelected ? HubSightColors.surfaceElevated : Colors.transparent,
+          borderRadius: HubSightRadius.roundedXl,
+          border: isSelected ? Border.all(color: HubSightColors.borderDark) : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? const Color(0xFFF97316) : const Color(0xFF94A3B8),
+            color: isSelected ? HubSightColors.primaryLight : HubSightColors.textMuted,
           ),
         ),
       ),

@@ -520,5 +520,105 @@ class AppLocalizationsVi extends AppLocalizations {
       'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
 
   @override
+  String get errAppKeyRequired =>
+      'Ứng dụng chưa được cấu hình API Key. Vui lòng quét mã QR hoặc cấu hình tệp .hscfg.';
+
+  @override
+  String get errAppKeyInvalid =>
+      'API Key của ứng dụng không hợp lệ hoặc đã bị thu hồi. Vui lòng cấu hình lại.';
+
+  @override
   String get errGeneric => 'Đã có lỗi xảy ra. Vui lòng thử lại sau.';
+
+  @override
+  String get scanQrTabTitle => 'Quét mã QR';
+
+  @override
+  String get scanQrDesc =>
+      'Hướng máy ảnh về mã QR cấu hình HubSight do Quản trị viên cấp.';
+
+  @override
+  String get scanQrPickImage => 'Chọn ảnh QR từ thư viện';
+
+  @override
+  String get scanQrInvalidPayload =>
+      'Mã QR không hợp lệ hoặc không phải định dạng HubSight.';
+
+  @override
+  String get scanQrDownloading => 'Đang tải tệp cấu hình...';
+
+  @override
+  String get scanQrChecksumMismatch =>
+      'Mã băm SHA-256 của tệp cấu hình không hợp lệ.';
+
+  @override
+  String get scanQrEnterPinPrompt => 'Nhập mã PIN 6 số để mở khóa cấu hình';
+
+  @override
+  String scanQrConfigIdentified(Object name) {
+    return 'Đã nhận diện: $name';
+  }
+
+  @override
+  String get cameraPermissionRequired =>
+      'Ứng dụng cần quyền truy cập máy ảnh để quét mã QR.';
+
+  @override
+  String get tabHscfgFile => 'Tệp cấu hình (.hscfg)';
+
+  @override
+  String get loginOrDivider => 'HOẶC';
+
+  @override
+  String get loginPasskeyBtn => 'Đăng nhập bằng Vân tay / Face ID';
+
+  @override
+  String get loginPasskeyBtnFaceId => 'Đăng nhập bằng Face ID';
+
+  @override
+  String get loginPasskeyBtnTouchId => 'Đăng nhập bằng Touch ID';
+
+  @override
+  String get loginPasskeyBtnFingerprint => 'Đăng nhập bằng Vân tay';
+
+  @override
+  String get loginBiometricPrompt =>
+      'Xác thực sinh trắc học để đăng nhập HubSight';
+
+  @override
+  String get loginBiometricNotConfigured =>
+      'Chưa lưu thông tin sinh trắc học trên thiết bị này. Vui lòng đăng nhập bằng mật khẩu trước để kích hoạt.';
+
+  @override
+  String get loginBiometricNotEnrolled =>
+      'Thiết bị chưa cài đặt vân tay hoặc Face ID trong Cài đặt máy.';
+
+  @override
+  String get loginBiometricNotSupported =>
+      'Thiết bị không hỗ trợ hoặc chưa cài đặt sinh trắc học.';
+
+  @override
+  String get loginBiometricFailed =>
+      'Xác thực sinh trắc học thất bại hoặc đã bị huỷ.';
+
+  @override
+  String get biometricEnrollPromptTitle => 'Kích hoạt sinh trắc học?';
+
+  @override
+  String get biometricEnrollPromptDesc =>
+      'Bạn có muốn sử dụng sinh trắc học để đăng nhập nhanh vào HubSight cho những lần sau không?';
+
+  @override
+  String get biometricEnrollEnable => 'Kích hoạt ngay';
+
+  @override
+  String get biometricEnrollLater => 'Để sau';
+
+  @override
+  String get biometricSettingsQuickLogin =>
+      'Đăng nhập nhanh bằng sinh trắc học';
+
+  @override
+  String get biometricSettingsQuickLoginDesc =>
+      'Sử dụng Face ID hoặc Vân tay để đăng nhập ngay mà không cần nhập mật khẩu.';
 }

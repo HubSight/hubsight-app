@@ -4,6 +4,7 @@ import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/sdk_provider.dart';
 import 'models/notification_model.dart';
+import '../../core/theme/app_theme.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
@@ -171,18 +172,23 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.deleteAll, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text(l10n.confirmDeleteAll),
+        backgroundColor: HubSightColors.cardDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedCard,
+          side: const BorderSide(color: HubSightColors.borderDark),
+        ),
+        title: Text(l10n.deleteAll, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: HubSightColors.textPrimary)),
+        content: Text(l10n.confirmDeleteAll, style: const TextStyle(color: HubSightColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel, style: const TextStyle(color: Color(0xFF64748B))),
+            child: Text(l10n.cancel, style: const TextStyle(color: HubSightColors.textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: HubSightColors.error,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
             ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(l10n.confirmDelete),
@@ -254,10 +260,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final unreadCount = _unreadCount;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: HubSightColors.bgDark,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: HubSightColors.cardDark,
         elevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        ),
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Row(
@@ -266,13 +275,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFFEDD5)),
+                color: HubSightColors.surfaceDark,
+                borderRadius: HubSightRadius.roundedXl,
+                border: Border.all(color: HubSightColors.borderDark),
               ),
               child: const Icon(
                 Icons.notifications_none_rounded,
-                color: Color(0xFFE85D10),
+                color: HubSightColors.primary,
                 size: 22,
               ),
             ),
@@ -289,7 +298,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                         style: const TextStyle(
                           fontSize: 16.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: HubSightColors.textPrimary,
                         ),
                       ),
                       if (unreadCount > 0) ...[
@@ -297,8 +306,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(10),
+                            color: HubSightColors.error,
+                            borderRadius: HubSightRadius.roundedXl,
                           ),
                           child: Text(
                             '$unreadCount',
@@ -317,7 +326,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     l10n.notificationSubtitle,
                     style: const TextStyle(
                       fontSize: 11.5,
-                      color: Color(0xFF64748B),
+                      color: HubSightColors.textMuted,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -328,7 +337,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+            icon: const Icon(Icons.close, color: HubSightColors.textSecondary),
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 8),
@@ -338,7 +347,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         children: [
           // Filter Tabs & Actions Bar
           Container(
-            color: Colors.white,
+            color: HubSightColors.cardDark,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -347,8 +356,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                 Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
+                    color: HubSightColors.surfaceDark,
+                    borderRadius: HubSightRadius.roundedXl,
+                    border: Border.all(color: HubSightColors.borderDark),
                   ),
                   child: Row(
                     children: [
@@ -372,19 +382,19 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     if (unreadCount > 0)
                       InkWell(
                         onTap: _handleMarkAllRead,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        borderRadius: HubSightRadius.roundedXl,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                           child: Row(
-                            children: const [
-                              Icon(Icons.done_all_rounded, size: 16, color: Color(0xFFE85D10)),
+                            children: [
+                              Icon(Icons.done_all_rounded, size: 16, color: HubSightColors.primary),
                               SizedBox(width: 4),
                               Text(
                                 'Đã đọc hết',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFFE85D10),
+                                  color: HubSightColors.primary,
                                 ),
                               ),
                             ],
@@ -394,19 +404,19 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     if (_notifications.isNotEmpty)
                       InkWell(
                         onTap: () => _handleClearAll(l10n),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: HubSightRadius.roundedXl,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                           child: Row(
                             children: [
-                              const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                              const Icon(Icons.delete_outline_rounded, size: 16, color: HubSightColors.textMuted),
                               const SizedBox(width: 4),
                               Text(
                                 l10n.deleteAll,
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF64748B),
+                                  color: HubSightColors.textMuted,
                                 ),
                               ),
                             ],
@@ -418,29 +428,29 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: HubSightColors.borderDark),
 
           // Notifications List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFE85D10)))
+                ? const Center(child: CircularProgressIndicator(color: HubSightColors.primary))
                 : _filteredList.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.notifications_off_outlined, size: 48, color: Colors.grey[400]),
+                            const Icon(Icons.notifications_off_outlined, size: 48, color: HubSightColors.textMuted),
                             const SizedBox(height: 12),
                             Text(
                               l10n.noNotifications,
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                              style: const TextStyle(color: HubSightColors.textMuted, fontSize: 14),
                             ),
                           ],
                         ),
                       )
                     : RefreshIndicator(
                         onRefresh: _fetchNotifications,
-                        color: const Color(0xFFE85D10),
+                        color: HubSightColors.primary,
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           itemCount: _filteredList.length,
@@ -463,29 +473,21 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }) {
     return InkWell(
       onTap: () => setState(() => _filter = key),
-      borderRadius: BorderRadius.circular(9),
+      borderRadius: HubSightRadius.roundedXl,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
+          color: isSelected ? HubSightColors.surfaceElevated : Colors.transparent,
+          borderRadius: HubSightRadius.roundedXl,
+          border: isSelected ? Border.all(color: HubSightColors.borderDark) : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            color: isSelected ? HubSightColors.primaryLight : HubSightColors.textMuted,
           ),
         ),
       ),
@@ -505,19 +507,19 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 
     if (isFamily) {
       categoryColor = const Color(0xFF10B981);
-      categoryBg = const Color(0xFFECFDF5);
+      categoryBg = const Color(0x2610B981);
       categoryIcon = Icons.verified_user_rounded;
     } else if (isGuest) {
-      categoryColor = const Color(0xFF3B82F6);
-      categoryBg = const Color(0xFFEFF6FF);
+      categoryColor = const Color(0xFF38BDF8);
+      categoryBg = const Color(0x2638BDF8);
       categoryIcon = Icons.handshake_outlined;
     } else if (isDanger) {
-      categoryColor = const Color(0xFFEF4444);
-      categoryBg = const Color(0xFFFEF2F2);
+      categoryColor = HubSightColors.error;
+      categoryBg = HubSightColors.errorBg;
       categoryIcon = Icons.warning_amber_rounded;
     } else {
-      categoryColor = const Color(0xFFE85D10);
-      categoryBg = const Color(0xFFFFF7ED);
+      categoryColor = HubSightColors.primary;
+      categoryBg = HubSightColors.primaryBg;
       categoryIcon = Icons.notifications_none_rounded;
     }
 
@@ -530,33 +532,26 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFEF4444),
-          borderRadius: BorderRadius.circular(16),
+          color: HubSightColors.errorBg,
+          borderRadius: HubSightRadius.roundedCard,
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+        child: const Icon(Icons.delete_outline, color: HubSightColors.errorText, size: 24),
       ),
       child: InkWell(
         onTap: () => _handleItemClick(item),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: HubSightRadius.roundedCard,
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: HubSightColors.cardDark,
+            borderRadius: HubSightRadius.roundedCard,
             border: Border.all(
-              color: item.isRead ? const Color(0xFFE2E8F0) : categoryColor.withOpacity(0.5),
-              width: item.isRead ? 1 : 1.5,
+              color: item.isRead ? HubSightColors.borderDark : categoryColor.withValues(alpha: 0.5),
+              width: 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: HubSightRadius.roundedCard,
             child: Stack(
               children: [
                 // Left stripe for unread notifications
@@ -565,7 +560,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     left: 0,
                     top: 0,
                     bottom: 0,
-                    width: 4,
+                    width: 3,
                     child: Container(color: categoryColor),
                   ),
 
@@ -582,8 +577,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                         height: 38,
                         decoration: BoxDecoration(
                           color: categoryBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: categoryColor.withOpacity(0.2)),
+                          borderRadius: HubSightRadius.roundedXl,
+                          border: Border.all(color: categoryColor.withValues(alpha: 0.3)),
                         ),
                         child: Icon(categoryIcon, color: categoryColor, size: 20),
                       ),
@@ -604,7 +599,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: !item.isRead ? FontWeight.bold : FontWeight.w600,
-                                      color: const Color(0xFF0F172A),
+                                      color: HubSightColors.textPrimary,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -615,7 +610,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                                   relativeTime,
                                   style: const TextStyle(
                                     fontSize: 11,
-                                    color: Color(0xFF94A3B8),
+                                    color: HubSightColors.textMuted,
                                   ),
                                 ),
                               ],
@@ -627,7 +622,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                               item.body,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF475569),
+                                color: HubSightColors.textSecondary,
                                 height: 1.35,
                               ),
                             ),
@@ -638,14 +633,14 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.videocam_outlined, size: 14, color: Color(0xFFE85D10)),
+                                  const Icon(Icons.videocam_outlined, size: 14, color: HubSightColors.primary),
                                   const SizedBox(width: 4),
                                   Text(
                                     l10n.viewPlayback,
                                     style: const TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFFE85D10),
+                                      color: HubSightColors.primary,
                                     ),
                                   ),
                                 ],
@@ -657,7 +652,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
 
                       // Delete action icon
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFCBD5E1)),
+                        icon: const Icon(Icons.close_rounded, size: 16, color: HubSightColors.textMuted),
                         onPressed: () => _handleDelete(item.id),
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
