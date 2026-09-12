@@ -20,7 +20,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _usernameController = TextEditingController(text: 'admin');
+  final _usernameController = TextEditingController(text: '');
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -117,7 +117,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       var sdk = ref.read(hubsightSdkProvider);
       if (sdk == null) {
         // Try restoring or initialize with default config
-        final restored = await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
+        final restored =
+            await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
         if (!restored) {
           // If still null, route user to config setup
           if (mounted) {
@@ -344,25 +345,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 color: HubSightColors.primaryBg,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.fingerprint_rounded, color: HubSightColors.primary, size: 24),
+              child: const Icon(Icons.fingerprint_rounded,
+                  color: HubSightColors.primary, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 _biometricLabel ?? 'Sinh trắc học',
-                style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: HubSightColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
         content: Text(
           l10n.loginBiometricNotConfigured,
-          style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 13, height: 1.4),
+          style: const TextStyle(
+              color: HubSightColors.textSecondary, fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK', style: TextStyle(color: HubSightColors.primary, fontWeight: FontWeight.bold)),
+            child: const Text('OK',
+                style: TextStyle(
+                    color: HubSightColors.primary,
+                    fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -412,7 +421,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             backgroundColor: HubSightColors.cardDark,
             shape: RoundedRectangleBorder(
               borderRadius: HubSightRadius.roundedCardLg,
-              side: const BorderSide(color: HubSightColors.borderDark, width: 1.0),
+              side: const BorderSide(
+                  color: HubSightColors.borderDark, width: 1.0),
             ),
             title: Row(
               children: [
@@ -422,32 +432,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     color: HubSightColors.primaryBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.fingerprint_rounded, color: HubSightColors.primary, size: 24),
+                  child: const Icon(Icons.fingerprint_rounded,
+                      color: HubSightColors.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     l10n.biometricEnrollPromptTitle,
-                    style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: HubSightColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
             content: Text(
               l10n.biometricEnrollPromptDesc,
-              style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 13, height: 1.4),
+              style: const TextStyle(
+                  color: HubSightColors.textSecondary,
+                  fontSize: 13,
+                  height: 1.4),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
-                child: Text(l10n.biometricEnrollLater, style: const TextStyle(color: HubSightColors.textMuted)),
+                child: Text(l10n.biometricEnrollLater,
+                    style: const TextStyle(color: HubSightColors.textMuted)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(ctx).pop(true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: HubSightColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: HubSightRadius.roundedXl),
                 ),
                 child: Text(l10n.biometricEnrollEnable),
               ),
@@ -460,7 +479,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             localizedReason: l10n.loginBiometricPrompt,
           );
           if (authenticated) {
-            await bio.saveBiometricCredentials(username: username, password: password);
+            await bio.saveBiometricCredentials(
+                username: username, password: password);
           }
         }
       }
@@ -790,7 +810,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                 MaterialPageRoute(
                                                   builder: (_) =>
                                                       const ServerConfigScreen(
-                                                          isInitialSetup: false),
+                                                          isInitialSetup:
+                                                              false),
                                                 ),
                                               );
                                             },
@@ -799,8 +820,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                   HubSightColors.error,
                                               foregroundColor: Colors.white,
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: HubSightRadius
-                                                    .roundedXl,
+                                                borderRadius:
+                                                    HubSightRadius.roundedXl,
                                               ),
                                               elevation: 0,
                                             ),
@@ -890,16 +911,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   width: double.infinity,
                                   height: 46,
                                   child: ElevatedButton(
-                                    onPressed: (_isLoading ||
-                                            _isBiometricLoading)
-                                        ? null
-                                        : _handleLogin,
+                                    onPressed:
+                                        (_isLoading || _isBiometricLoading)
+                                            ? null
+                                            : _handleLogin,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: HubSightColors.primary,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            HubSightRadius.roundedXl,
+                                        borderRadius: HubSightRadius.roundedXl,
                                       ),
                                       elevation: 0,
                                     ),
@@ -971,10 +991,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   width: double.infinity,
                                   height: 46,
                                   child: OutlinedButton(
-                                    onPressed: (_isLoading ||
-                                            _isBiometricLoading)
-                                        ? null
-                                        : _handleBiometricLogin,
+                                    onPressed:
+                                        (_isLoading || _isBiometricLoading)
+                                            ? null
+                                            : _handleBiometricLogin,
                                     style: OutlinedButton.styleFrom(
                                       backgroundColor:
                                           HubSightColors.surfaceDark,
@@ -984,8 +1004,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                           color: HubSightColors.borderDark,
                                           width: 1.0),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            HubSightRadius.roundedXl,
+                                        borderRadius: HubSightRadius.roundedXl,
                                       ),
                                     ),
                                     child: _isBiometricLoading
@@ -1004,8 +1023,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               Icon(
                                                 _biometricLabel == 'Face ID'
                                                     ? Icons.face_rounded
-                                                    : Icons
-                                                        .fingerprint_rounded,
+                                                    : Icons.fingerprint_rounded,
                                                 color: HubSightColors.primary,
                                                 size: 20,
                                               ),
@@ -1013,7 +1031,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               Flexible(
                                                 child: Text(
                                                   _getBiometricButtonText(l10n),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   maxLines: 1,
                                                   style: const TextStyle(
                                                     fontSize: 14,
@@ -1116,8 +1135,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       backgroundColor: HubSightColors.primary,
                                       foregroundColor: Colors.white,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            HubSightRadius.roundedXl,
+                                        borderRadius: HubSightRadius.roundedXl,
                                       ),
                                       elevation: 0,
                                     ),
