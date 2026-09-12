@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/network/sdk_provider.dart';
+import '../../core/services/fcm_service.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
 import '../camera/playback_screen.dart';
@@ -29,16 +32,30 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
     );
   }
 
-  void _handleLogout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+  Future<void> _handleLogout() async {
+    final sdk = ref.read(hubsightSdkProvider);
+    final fcm = ref.read(fcmServiceProvider);
+    if (sdk != null) {
+      final token = fcm.fcmToken;
+      if (token != null) {
+        try {
+          await sdk.fcm.unregisterPushToken(token);
+        } catch (_) {}
+      }
+      await sdk.auth.logout();
+    }
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final currentUser = ref.watch(hubsightSdkProvider)?.auth.currentUser;
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -116,10 +133,10 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 12.0),
                   children: [
-                    // Home / Trang chủ -> Navigate to playback screen
+                    // Home / Trang chủ -> Playback screen (Timeline & Live single)
                     _buildMenuItem(
                       context: context,
-                      icon: Icons.home_outlined,
+                      icon: Icons.play_circle_outline,
                       label: l10n.menuHome,
                       isSelected: widget.activeRoute == 'home',
                       onTap: () {
@@ -130,6 +147,38 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                             MaterialPageRoute(builder: (_) => const PlaybackScreen()),
                           );
                         }
+                      },
+                    ),
+
+                    // Dashboard / Lưới Camera -> DashboardScreen
+                    _buildMenuItem(
+                      context: context,
+                      icon: Icons.grid_view_rounded,
+                      label: l10n.dashboardTitle,
+                      isSelected: widget.activeRoute == 'dashboard',
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (widget.activeRoute != 'dashboard') {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const DashboardScreen()),
+                          );
+                        }
+                      },
+                    ),
+
+                    // Notifications / Thông báo -> NotificationScreen
+                    _buildMenuItem(
+                      context: context,
+                      icon: Icons.notifications_none_rounded,
+                      label: l10n.notificationTitle,
+                      isSelected: widget.activeRoute == 'notifications',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NotificationScreen()),
+                        );
                       },
                     ),
                   ],
@@ -354,9 +403,11 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Administrator',
-                                    style: TextStyle(
+                                  Text(
+                                    currentUser?.fullName.isNotEmpty == true
+                                        ? currentUser!.fullName
+                                        : 'Administrator',
+                                    style: const TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF0F172A),
@@ -374,7 +425,7 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                           border: Border.all(color: const Color(0xFFFECACA)),
                                         ),
                                         child: Text(
-                                          l10n.adminRole,
+                                          currentUser?.role.toUpperCase() ?? l10n.adminRole,
                                           style: const TextStyle(
                                             fontSize: 9.5,
                                             fontWeight: FontWeight.bold,
@@ -383,9 +434,9 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
                                         ),
                                       ),
                                       const SizedBox(width: 6),
-                                      const Text(
-                                        '@admin',
-                                        style: TextStyle(
+                                      Text(
+                                        '@${currentUser?.username ?? "admin"}',
+                                        style: const TextStyle(
                                           fontSize: 11.5,
                                           color: Color(0xFF64748B),
                                         ),

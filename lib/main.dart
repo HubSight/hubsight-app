@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/network/sdk_provider.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/in_app_notification_service.dart';
 import 'core/storage/storage_service.dart';
 import 'features/auth/app_lock_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'features/camera/playback_screen.dart';
+import 'features/common/maintenance_screen.dart';
 import 'features/config/server_config_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize local preferences
   final prefs = await SharedPreferences.getInstance();
-  
+
   runApp(
     ProviderScope(
       overrides: [
@@ -36,20 +38,54 @@ class HubSightApp extends ConsumerStatefulWidget {
   ConsumerState<HubSightApp> createState() => _HubSightAppState();
 }
 
-class _HubSightAppState extends ConsumerState<HubSightApp> with WidgetsBindingObserver {
+class _HubSightAppState extends ConsumerState<HubSightApp>
+    with WidgetsBindingObserver {
   bool _isLockScreenShowing = false;
+  bool _isCheckingInitialAuth = true;
+  bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
-    // Initialize in-app notification manager & FCM push notifications
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(inAppNotificationServiceProvider).attachNavigatorKey(rootNavigatorKey);
+
+    // Initialize SDK, FCM push notifications & App lock
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      ref
+          .read(inAppNotificationServiceProvider)
+          .attachNavigatorKey(rootNavigatorKey);
       ref.read(fcmServiceProvider).initialize();
+
+      // Restore SDK from storage if previously enrolled
+      await _initializeSdkSession();
       _checkInitialAppLock();
     });
+  }
+
+  Future<void> _initializeSdkSession() async {
+    final sdkNotifier = ref.read(hubsightSdkProvider.notifier);
+    final restored = await sdkNotifier.restoreFromStorage();
+
+    if (restored) {
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final isAuth = await sdk.auth.isAuthenticated;
+        if (mounted) {
+          setState(() {
+            _isAuthenticated = isAuth;
+            _isCheckingInitialAuth = false;
+          });
+          return;
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isAuthenticated = false;
+        _isCheckingInitialAuth = false;
+      });
+    }
   }
 
   @override
@@ -61,7 +97,8 @@ class _HubSightAppState extends ConsumerState<HubSightApp> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final bio = ref.read(biometricServiceProvider);
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       bio.recordBackgroundTime();
     } else if (state == AppLifecycleState.resumed) {
       _checkAppLock();
@@ -70,16 +107,14 @@ class _HubSightAppState extends ConsumerState<HubSightApp> with WidgetsBindingOb
 
   void _checkInitialAppLock() {
     final bio = ref.read(biometricServiceProvider);
-    final storage = ref.read(storageServiceProvider);
-    if (storage.hasAuthToken() && bio.isAppLockEnabled) {
+    if (_isAuthenticated && bio.isAppLockEnabled) {
       _showAppLockModal();
     }
   }
 
   void _checkAppLock() {
     final bio = ref.read(biometricServiceProvider);
-    final storage = ref.read(storageServiceProvider);
-    if (storage.hasAuthToken() && bio.shouldRequireUnlock()) {
+    if (_isAuthenticated && bio.shouldRequireUnlock()) {
       _showAppLockModal();
     }
   }
@@ -90,7 +125,8 @@ class _HubSightAppState extends ConsumerState<HubSightApp> with WidgetsBindingOb
     if (context == null) return;
 
     _isLockScreenShowing = true;
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       PageRouteBuilder(
         opaque: true,
         pageBuilder: (context, _, __) => AppLockScreen(
@@ -101,38 +137,46 @@ class _HubSightAppState extends ConsumerState<HubSightApp> with WidgetsBindingOb
           },
         ),
       ),
-    ).then((_) {
+    )
+        .then((_) {
       _isLockScreenShowing = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final storage = ref.watch(storageServiceProvider);
-    final hasServer = storage.hasServerUrl();
+    final maintenanceEx = ref.watch(maintenanceStateProvider);
+    final sdk = ref.watch(hubsightSdkProvider);
 
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
       title: 'HubSight CCTV',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE85D10)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE85D10),
+          primary: const Color(0xFFE85D10),
+        ),
         useMaterial3: true,
       ),
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en'),
-        Locale('vi'),
-      ],
-      // Set to vi by default as per mockups, or let the system decide
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('vi'),
-      home: hasServer
-          ? const LoginScreen()
-          : const ServerConfigScreen(isInitialSetup: true),
+      home: maintenanceEx != null
+          ? const MaintenanceScreen()
+          : _isCheckingInitialAuth
+              ? const Scaffold(
+                  backgroundColor: Color(0xFF0F172A),
+                  body: Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFE85D10),
+                    ),
+                  ),
+                )
+              : sdk == null
+                  ? const ServerConfigScreen(isInitialSetup: true)
+                  : _isAuthenticated
+                      ? const PlaybackScreen()
+                      : const LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

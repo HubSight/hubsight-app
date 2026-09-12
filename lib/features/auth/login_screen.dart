@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/network/api_client.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
+import '../../core/localization/error_localizer.dart';
+import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
-import '../../core/storage/storage_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../camera/playback_screen.dart';
 import '../config/server_config_screen.dart';
+import 'change_password_dialog.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,25 +24,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // 2FA State
+  bool _showTwoFactorModal = false;
+  String? _preAuthToken;
+  final _totpController = TextEditingController();
+  final _recoveryCodeController = TextEditingController();
+  bool _useRecoveryCode = false;
+  bool _isVerifying2FA = false;
+  String? _twoFactorError;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkRemoteRevocation();
       _checkQuickBiometricLogin();
     });
   }
 
+  void _checkRemoteRevocation() {
+    final wasRevoked = ref.read(remoteRevocationEventProvider);
+    if (wasRevoked) {
+      ref.read(remoteRevocationEventProvider.notifier).reset();
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(l10n.remoteRevokedAlert)),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _checkQuickBiometricLogin() async {
     final bio = ref.read(biometricServiceProvider);
-    final storage = ref.read(storageServiceProvider);
-    if (bio.isBiometricEnabled && storage.hasAuthToken()) {
-      final success = await bio.authenticate(
-        localizedReason: 'Đăng nhập nhanh bằng sinh trắc học vào HubSight CCTV',
-      );
-      if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+    final sdk = ref.read(hubsightSdkProvider);
+
+    if (bio.isBiometricEnabled && sdk != null) {
+      final isAuthed = await sdk.auth.isAuthenticated;
+      if (isAuthed) {
+        final success = await bio.authenticate(
+          localizedReason: 'Đăng nhập nhanh bằng sinh trắc học vào HubSight',
         );
+        if (success && mounted) {
+          _navigateToHome();
+        }
       }
     }
   }
@@ -47,6 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
+    final l10n = AppLocalizations.of(context)!;
 
     if (username.isEmpty || password.isEmpty) return;
 
@@ -56,18 +93,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.login(username, password);
+      var sdk = ref.read(hubsightSdkProvider);
+      if (sdk == null) {
+        // Try restoring or initialize with default config
+        final restored = await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
+        if (!restored) {
+          // If still null, route user to config setup
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ServerConfigScreen()),
+            );
+          }
+          return;
+        }
+        sdk = ref.read(hubsightSdkProvider);
+      }
 
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const PlaybackScreen()),
-        );
+      if (sdk == null) return;
+
+      final result = await sdk.auth.login(
+        username: username,
+        password: password,
+      );
+
+      if (result.requires2FA) {
+        // Show 2FA Verification Dialog
+        setState(() {
+          _preAuthToken = result.preAuthToken;
+          _showTwoFactorModal = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (result.isSuccess) {
+        await _onLoginSuccess(result);
+      } else {
+        setState(() {
+          _errorMessage = result.message ?? l10n.errAuthInvalidCredentials;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Đăng nhập không thành công. Vui lòng kiểm tra lại tài khoản hoặc máy chủ.';
+          _errorMessage = AppErrorLocalizer.localize(e, l10n);
         });
       }
     } finally {
@@ -77,364 +146,617 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _handleVerify2FA() async {
+    final l10n = AppLocalizations.of(context)!;
+    final code = _totpController.text.trim();
+    final recoveryCode = _recoveryCodeController.text.trim();
+
+    if (_preAuthToken == null) return;
+    if (!_useRecoveryCode && (code.length != 6 || int.tryParse(code) == null)) {
+      setState(() => _twoFactorError = l10n.twoFactorFailed);
+      return;
+    }
+    if (_useRecoveryCode && recoveryCode.isEmpty) {
+      setState(() => _twoFactorError = 'Vui lòng nhập mã khôi phục');
+      return;
+    }
+
+    setState(() {
+      _isVerifying2FA = true;
+      _twoFactorError = null;
+    });
+
+    try {
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk == null) return;
+
+      final result = await sdk.auth.verify2FA(
+        preAuthToken: _preAuthToken!,
+        code: _useRecoveryCode ? '' : code,
+        recoveryCode: _useRecoveryCode ? recoveryCode : null,
+      );
+
+      if (result.isSuccess) {
+        setState(() => _showTwoFactorModal = false);
+        await _onLoginSuccess(result);
+      } else {
+        setState(() {
+          _twoFactorError = result.message ?? l10n.twoFactorFailed;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _twoFactorError = AppErrorLocalizer.localize(e, l10n);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isVerifying2FA = false);
+    }
+  }
+
+  Future<void> _onLoginSuccess(AuthResult result) async {
+    // 1. Check forced password change
+    if (result.mustChangePassword && mounted) {
+      final changed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const ChangePasswordDialog(isForced: true),
+      );
+      if (changed != true) return;
+    }
+
+    // 2. Register FCM Device Token
+    final fcm = ref.read(fcmServiceProvider);
+    final token = fcm.fcmToken;
+    final sdk = ref.read(hubsightSdkProvider);
+    if (token != null && sdk != null) {
+      try {
+        await sdk.fcm.registerPushToken(token);
+      } catch (e) {
+        debugPrint('FCM register token notice: $e');
+      }
+    }
+
+    // 3. Connect Realtime Relay
+    sdk?.relay.connect();
+
+    // 4. Navigate
+    if (mounted) {
+      _navigateToHome();
+    }
+  }
+
+  void _navigateToHome() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+    );
+  }
+
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _totpController.dispose();
+    _recoveryCodeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final sdk = ref.watch(hubsightSdkProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1E212A), // Dark background for the top
+      backgroundColor: const Color(0xFF0F172A),
       body: Stack(
         children: [
-          // Top left server settings button
+          // Background Gradient decoration
           Positioned(
-            top: 50,
-            left: 20,
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ServerConfigScreen(isInitialSetup: false)),
-                );
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.dns_rounded, size: 16, color: Color(0xFFE85D10)),
-                    const SizedBox(width: 6),
-                    Text(
-                      l10n.changeServer,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFFE85D10).withOpacity(0.2),
+                    Colors.transparent,
                   ],
                 ),
               ),
             ),
           ),
-          // Top right language button
-          Positioned(
-            top: 50,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
+
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.language, size: 16, color: Colors.black87),
-                  const SizedBox(width: 6),
-                  Text(
-                    l10n.languageSelector,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Main content container
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.85, // Takes up ~85% of screen
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F6F8), // Light gray background
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-                    // Drag handle
-                    Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    
-                    // Logo Icon
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE85D10), // Orange color
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt_outlined,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Title
-                    Text(
-                      l10n.appTitle,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Subtitle
-                    Text(
-                      l10n.loginSubtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    
-                    // Username Field
-                    _buildTextField(
-                      label: l10n.usernameLabel,
-                      hintText: l10n.usernameHint,
-                      controller: _usernameController,
-                      prefixIcon: Icons.person_outline,
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Password Field
-                    _buildTextField(
-                      label: l10n.passwordLabel,
-                      hintText: l10n.passwordHint,
-                      controller: _passwordController,
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: _obscurePassword,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          color: const Color(0xFF9CA3AF),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, size: 16, color: Color(0xFFEF4444)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
+                  // Top bar: Server status & Config button
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 24.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Server URL chip
+                        InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ServerConfigScreen(isInitialSetup: false),
                               ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF334155)),
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-                    
-                    // Login Button Row
-                    Consumer(
-                      builder: (context, ref, child) {
-                        final bio = ref.watch(biometricServiceProvider);
-                        final storage = ref.watch(storageServiceProvider);
-                        final showBio = bio.isBiometricEnabled && storage.hasAuthToken();
-
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _handleLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFE85D10),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              l10n.loginButton,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const Icon(Icons.arrow_forward, size: 20),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            ),
-                            if (showBio) ...[
-                              const SizedBox(width: 12),
-                              InkWell(
-                                onTap: _checkQuickBiometricLogin,
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  width: 50,
-                                  height: 50,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF7ED),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFFFEDD5)),
-                                  ),
-                                  child: const Icon(
-                                    Icons.fingerprint_rounded,
-                                    color: Color(0xFFE85D10),
-                                    size: 28,
+                                    color: sdk != null ? const Color(0xFF10B981) : Colors.amber,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                    
-                    const Spacer(),
-                    
-                    // Footer
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 24.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            l10n.footerVersion,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF9CA3AF),
-                              fontWeight: FontWeight.w500,
+                                const SizedBox(width: 8),
+                                Text(
+                                  sdk?.config.urls.gatewayUrl ?? 'Chưa cấu hình máy chủ',
+                                  style: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.settings_outlined, size: 14, color: Color(0xFF94A3B8)),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 4),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Brand Logo & Title
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE85D10),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE85D10).withOpacity(0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.videocam_rounded,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'HubSight',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
                           Text(
-                            l10n.footerCopyright,
+                            l10n.loginSubtitle,
                             style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF9CA3AF),
+                              fontSize: 12.5,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  // Error Banner
+                  if (_errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 12.5),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ),
+
+                  // Username Field
+                  Text(
+                    l10n.usernameLabel,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _usernameController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: l10n.usernameHint,
+                      hintStyle: const TextStyle(color: Color(0xFF475569)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF64748B), size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE85D10), width: 1.5),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Password Field
+                  Text(
+                    l10n.passwordLabel,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: l10n.passwordHint,
+                      hintStyle: const TextStyle(color: Color(0xFF475569)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF64748B), size: 20),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: const Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: Color(0xFFE85D10), width: 1.5),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Login Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE85D10),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : Text(
+                              l10n.loginButton,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 48),
+
+                  // Footer
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          l10n.footerVersion,
+                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.footerCopyright,
+                          style: const TextStyle(color: Color(0xFF475569), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+
+          // 2FA Challenge Modal Overlay
+          if (_showTwoFactorModal) _buildTwoFactorModal(l10n),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required String label,
-    required String hintText,
-    required TextEditingController controller,
-    required IconData prefixIcon,
-    bool obscureText = false,
-    Widget? suffixIcon,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4B5563),
+  Widget _buildTwoFactorModal(AppLocalizations l10n) {
+    return Container(
+      color: Colors.black87,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Container(
+            padding: const EdgeInsets.all(24.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF334155)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE85D10).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.security, color: Color(0xFFE85D10), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.twoFactorTitle,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.twoFactorSubtitle,
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                if (_twoFactorError != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      _twoFactorError!,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                    ),
+                  ),
+                ],
+
+                if (!_useRecoveryCode) ...[
+                  Text(
+                    l10n.twoFactorCodeLabel,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _totpController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      letterSpacing: 6,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: l10n.twoFactorCodeHint,
+                      hintStyle: const TextStyle(color: Color(0xFF475569), letterSpacing: 6),
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE85D10), width: 1.5),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    l10n.recoveryCodeLabel,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _recoveryCodeController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Nhập mã khôi phục 8-16 ký tự',
+                      hintStyle: const TextStyle(color: Color(0xFF475569)),
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF334155)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE85D10), width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+
+                // Toggle Recovery Code mode
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _useRecoveryCode = !_useRecoveryCode;
+                        _twoFactorError = null;
+                      });
+                    },
+                    child: Text(
+                      _useRecoveryCode ? 'Sử dụng mã xác thực 6 số' : l10n.useRecoveryCode,
+                      style: const TextStyle(color: Color(0xFFE85D10), fontSize: 12),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _showTwoFactorModal = false;
+                            _totpController.clear();
+                            _recoveryCodeController.clear();
+                          });
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF475569)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(l10n.cancel, style: const TextStyle(color: Color(0xFF94A3B8))),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isVerifying2FA ? null : _handleVerify2FA,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE85D10),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: _isVerifying2FA
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Text(
+                                l10n.verifyButton,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          style: const TextStyle(
-            color: Color(0xFF1F2937),
-            fontSize: 16,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
-            prefixIcon: Icon(prefixIcon, color: const Color(0xFF9CA3AF)),
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE85D10)),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
-
-

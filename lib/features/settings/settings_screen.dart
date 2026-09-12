@@ -1,12 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/auth_models.dart';
-import '../../core/network/api_client.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
+import '../../core/localization/error_localizer.dart';
+import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
-import '../../core/storage/storage_service.dart';
-import '../auth/app_lock_screen.dart';
+import '../../core/services/fcm_service.dart';
+import '../auth/change_password_dialog.dart';
+import '../auth/login_screen.dart';
 import '../config/server_config_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -17,18 +19,12 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  String _selectedTimezone = 'UTC+7 (Vietnam, Bangkok, Jakarta)';
-  
-  final List<String> _timezones = [
-    'UTC+7 (Vietnam, Bangkok, Jakarta)',
-    'UTC+8 (Singapore, Beijing, Taipei)',
-    'UTC+9 (Tokyo, Seoul)',
-    'UTC+0 (London, GMT)',
-    'UTC-5 (New York, EST)',
-    'UTC-8 (Los Angeles, PST)',
-  ];
+  UserProfile? _profile;
+  List<SessionItem> _sessions = [];
+  bool _isLoadingProfile = true;
+  bool _isLoadingSessions = true;
 
-  // Push notification preferences (default enabled)
+  // Push notification preferences
   bool _pushFamily = true;
   bool _pushStranger = true;
   bool _pushSystem = true;
@@ -36,8 +32,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // Security preferences
   bool _lockOnBackground = false;
   bool _biometricUnlock = false;
-  
-  // Timeout: 'immediate' | '1min' | '5mins'
   String _selectedTimeout = 'immediate';
 
   @override
@@ -54,723 +48,632 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } else {
       _selectedTimeout = 'immediate';
     }
+
+    _loadProfileAndSessions();
   }
 
-  void _syncPushPreferences() {
-    ref.read(apiClientProvider).updatePreferences(
-      PushPreferences(
-        family: _pushFamily,
-        guest: _pushFamily,
-        stranger: _pushStranger,
-        system: _pushSystem,
+  Future<void> _loadProfileAndSessions() async {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) return;
+
+    // 1. Profile
+    try {
+      final profile = await sdk.auth.getProfile();
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _pushFamily = profile.pushPreferences['family'] ?? true;
+          _pushStranger = profile.pushPreferences['stranger'] ?? true;
+          _pushSystem = profile.pushPreferences['system'] ?? true;
+          _isLoadingProfile = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
+
+    // 2. Sessions
+    _fetchSessions();
+  }
+
+  Future<void> _fetchSessions() async {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) return;
+
+    setState(() => _isLoadingSessions = true);
+    try {
+      final sessions = await sdk.auth.listSessions();
+      if (mounted) {
+        setState(() {
+          _sessions = sessions;
+          _isLoadingSessions = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingSessions = false);
+    }
+  }
+
+  Future<void> _handleRevokeSession(SessionItem session, AppLocalizations l10n) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l10n.revokeSession, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(l10n.confirmRevokeSession),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel, style: const TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.revokeSession),
+          ),
+        ],
       ),
     );
-  }
 
-  void _showTimezonePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: Colors.white,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        l10n.selectTimezone,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Color(0xFF64748B)),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                ..._timezones.map((tz) {
-                  final isSelected = tz == _selectedTimezone;
-                  return ListTile(
-                    title: Text(
-                      tz,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? const Color(0xFFE85D10) : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle, color: Color(0xFFE85D10))
-                        : null,
-                    onTap: () {
-                      setState(() => _selectedTimezone = tz);
-                      ref.read(apiClientProvider).updateTimezone(tz);
-                      Navigator.pop(context);
-                    },
-                  );
-                }),
-              ],
+    if (confirm != true) return;
+
+    try {
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        await sdk.auth.revokeSession(session.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.sessionRevokedSuccess),
+              backgroundColor: const Color(0xFF10B981),
             ),
+          );
+          _fetchSessions();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppErrorLocalizer.localize(e, l10n)),
+            backgroundColor: const Color(0xFFDC2626),
           ),
         );
-      },
-    );
+      }
+    }
+  }
+
+  Future<void> _syncPushPreferences() async {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk != null) {
+      try {
+        await sdk.auth.updateProfile(
+          pushPreferences: {
+            'family': _pushFamily,
+            'stranger': _pushStranger,
+            'system': _pushSystem,
+          },
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    final sdk = ref.read(hubsightSdkProvider);
+    final fcm = ref.read(fcmServiceProvider);
+
+    if (sdk != null) {
+      final token = fcm.fcmToken;
+      if (token != null) {
+        try {
+          await sdk.fcm.unregisterPushToken(token);
+        } catch (_) {}
+      }
+      await sdk.auth.logout();
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final sdk = ref.watch(hubsightSdkProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        title: Text(
+          l10n.settingsTitle,
+          style: const TextStyle(
+            fontSize: 16.5,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            // Shield Icon in light orange container
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFFEDD5)),
-              ),
-              child: const Icon(
-                Icons.shield_outlined,
-                color: Color(0xFFE85D10),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Title & Subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.settingsTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    l10n.settingsSubtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF64748B),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.close, color: Color(0xFF64748B)),
-            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.logout, color: Color(0xFFDC2626)),
+            tooltip: l10n.logout,
+            onPressed: _handleLogout,
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Card 1: App / Web Mode Info Badge
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2.0),
-                    child: Icon(
-                      Icons.smartphone_outlined,
-                      color: Color(0xFF64748B),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.appModeTitle,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          l10n.appModeDesc,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // 1. User Profile Card
+            _buildProfileCard(l10n),
+            const SizedBox(height: 18),
 
-            const SizedBox(height: 14),
+            // 2. Devices & Active Sessions
+            _buildSessionsCard(l10n),
+            const SizedBox(height: 18),
 
-            // Card 2: Display Timezone Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.language, color: Color(0xFFE85D10), size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.timezoneTitle,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.timezoneDesc,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF64748B),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Dropdown pill
-                  InkWell(
-                    onTap: _showTimezonePicker,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              _selectedTimezone,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF0F172A),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.keyboard_arrow_down,
-                            color: Color(0xFF94A3B8),
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // 3. Security Settings (Lock & Password)
+            _buildSecurityCard(l10n),
+            const SizedBox(height: 18),
 
-            const SizedBox(height: 14),
+            // 4. Push Notification Settings
+            _buildPushSettingsCard(l10n),
+            const SizedBox(height: 18),
 
-            // Card 3: Push Notification Settings Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.notifications_none_rounded, color: Color(0xFFE85D10), size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.pushSettingsTitle,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.pushSettingsSubtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Option 1: Người quen (Gia đình, Khách)
-                  _buildPushSwitchTile(
-                    title: l10n.pushFamily,
-                    subtitle: l10n.pushFamilyDesc,
-                    value: _pushFamily,
-                    onChanged: (val) {
-                      setState(() => _pushFamily = val);
-                      _syncPushPreferences();
-                    },
-                  ),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10.0),
-                    child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  ),
-
-                  // Option 2: Cảnh báo an ninh & Người lạ
-                  _buildPushSwitchTile(
-                    title: l10n.pushStranger,
-                    subtitle: l10n.pushStrangerDesc,
-                    value: _pushStranger,
-                    onChanged: (val) {
-                      setState(() => _pushStranger = val);
-                      _syncPushPreferences();
-                    },
-                  ),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10.0),
-                    child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  ),
-
-                  // Option 3: Thông báo hệ thống
-                  _buildPushSwitchTile(
-                    title: l10n.pushSystem,
-                    subtitle: l10n.pushSystemDesc,
-                    value: _pushSystem,
-                    onChanged: (val) {
-                      setState(() => _pushSystem = val);
-                      _syncPushPreferences();
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Card 4: Lock on Background Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.lockOnBackground,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              l10n.lockOnBackgroundDesc,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF64748B),
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      CupertinoSwitch(
-                        activeColor: const Color(0xFFE85D10),
-                        value: _lockOnBackground,
-                        onChanged: (val) async {
-                          final bio = ref.read(biometricServiceProvider);
-                          if (val) {
-                            if (!bio.hasPin) {
-                              // Set new PIN
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => AppLockScreen(
-                                    isCreatingPin: true,
-                                    onUnlocked: () {
-                                      Navigator.pop(context);
-                                      setState(() => _lockOnBackground = true);
-                                    },
-                                  ),
-                                ),
-                              );
-                            } else {
-                              await bio.setAppLockEnabled(true);
-                              setState(() => _lockOnBackground = true);
-                            }
-                          } else {
-                            await bio.setAppLockEnabled(false);
-                            setState(() => _lockOnBackground = false);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  if (_lockOnBackground) ...[
-                    const SizedBox(height: 10),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AppLockScreen(
-                              isCreatingPin: true,
-                              onUnlocked: () {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Đã cập nhật mã PIN mới')),
-                                );
-                              },
-                            ),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
-                            Text(
-                              'Đổi mã PIN mở khóa',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFE85D10),
-                              ),
-                            ),
-                            Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Color(0xFFE85D10)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Card 5: Biometric Unlock Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2.0),
-                    child: Icon(
-                      Icons.fingerprint,
-                      color: Color(0xFFE85D10),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.biometricUnlock,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          l10n.biometricUnlockDesc,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            color: Color(0xFF64748B),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2.0),
-                    child: CupertinoSwitch(
-                      activeColor: const Color(0xFFE85D10),
-                      value: _biometricUnlock,
-                      onChanged: (val) async {
-                        final bio = ref.read(biometricServiceProvider);
-                        if (val) {
-                          final canAuth = await bio.canCheckBiometrics();
-                          if (!canAuth) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Thiết bị không hỗ trợ sinh trắc học')),
-                              );
-                            }
-                            return;
-                          }
-                          final success = await bio.authenticate(
-                            localizedReason: 'Xác thực để kích hoạt khóa sinh trắc học',
-                          );
-                          if (success) {
-                            await bio.setBiometricEnabled(true);
-                            setState(() => _biometricUnlock = true);
-                          }
-                        } else {
-                          await bio.setBiometricEnabled(false);
-                          setState(() => _biometricUnlock = false);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Card 6: Screen Lock Timeout Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time_rounded,
-                        color: Color(0xFF94A3B8),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.lockTimeoutTitle,
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF475569),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.lockTimeoutDesc,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF94A3B8),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Timeout Option Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTimeoutButton(
-                          key: 'immediate',
-                          label: l10n.timeoutImmediately,
-                          isSelected: _selectedTimeout == 'immediate',
-                          onTap: () {
-                            setState(() => _selectedTimeout = 'immediate');
-                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(0);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildTimeoutButton(
-                          key: '1min',
-                          label: l10n.timeout1Min,
-                          isSelected: _selectedTimeout == '1min',
-                          onTap: () {
-                            setState(() => _selectedTimeout = '1min');
-                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(1);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildTimeoutButton(
-                          key: '5mins',
-                          label: l10n.timeout5Mins,
-                          isSelected: _selectedTimeout == '5mins',
-                          onTap: () {
-                            setState(() => _selectedTimeout = '5mins');
-                            ref.read(biometricServiceProvider).setLockTimeoutMinutes(5);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // Card 7: Server Configuration Card
-            Consumer(
-              builder: (context, ref, child) {
-                final storage = ref.watch(storageServiceProvider);
-                final currentServer = storage.getServerUrl() ?? 'http://10.0.2.2:8088';
-
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.dns_rounded, color: Color(0xFFE85D10), size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.serverConfigTitle,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              currentServer,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF64748B),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ServerConfigScreen(isInitialSetup: false),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          l10n.changeServer,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE85D10),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
+            // 5. Server & Container Config Card
+            _buildServerInfoCard(sdk, l10n),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPushSwitchTile({
+  Widget _buildProfileCard(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: _isLoadingProfile
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFE85D10)))
+          : Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFFEDD5)),
+                  ),
+                  child: const Icon(Icons.person, color: Color(0xFFE85D10), size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _profile?.fullName.isNotEmpty == true ? _profile!.fullName : 'Administrator',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${_profile?.username ?? "admin"} • ${_profile?.role.toUpperCase() ?? "ADMIN"}',
+                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => const ChangePasswordDialog(),
+                    );
+                  },
+                  icon: const Icon(Icons.key, size: 16, color: Color(0xFFE85D10)),
+                  label: Text(
+                    l10n.changePasswordTitle,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFE85D10), fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSessionsCard(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.devices, color: Color(0xFFE85D10), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.sessionsTitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF64748B)),
+                onPressed: _fetchSessions,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.sessionsSubtitle,
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 14),
+
+          if (_isLoadingSessions)
+            const Center(child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(color: Color(0xFFE85D10)),
+            ))
+          else if (_sessions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Không có phiên nào khác đang hoạt động',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _sessions.length,
+              separatorBuilder: (_, __) => const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              itemBuilder: (context, index) {
+                final s = _sessions[index];
+                return Row(
+                  children: [
+                    Icon(
+                      s.clientType?.contains('mobile') == true
+                          ? Icons.phone_iphone
+                          : Icons.laptop,
+                      color: s.isCurrent ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  s.deviceLabel ?? s.clientType ?? 'Thiết bị',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (s.isCurrent) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    l10n.currentSession,
+                                    style: const TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'IP: ${s.ipAddress ?? "Unknown"} • ${s.geoCity ?? "Local"}',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!s.isCurrent)
+                      TextButton(
+                        onPressed: () => _handleRevokeSession(s, l10n),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        ),
+                        child: Text(l10n.revokeSession, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityCard(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.shield_outlined, color: Color(0xFFE85D10), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Bảo mật Ứng dụng',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          _buildSwitchRow(
+            title: l10n.lockOnBackground,
+            subtitle: l10n.lockOnBackgroundDesc,
+            value: _lockOnBackground,
+            onChanged: (v) {
+              setState(() => _lockOnBackground = v);
+              ref.read(biometricServiceProvider).setAppLockEnabled(v);
+            },
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+          _buildSwitchRow(
+            title: l10n.biometricUnlock,
+            subtitle: l10n.biometricUnlockDesc,
+            value: _biometricUnlock,
+            onChanged: (v) {
+              setState(() => _biometricUnlock = v);
+              ref.read(biometricServiceProvider).setBiometricEnabled(v);
+            },
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+          Text(
+            l10n.lockTimeoutTitle,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTimeoutButton(
+                  key: 'immediate',
+                  label: l10n.timeoutImmediately,
+                  isSelected: _selectedTimeout == 'immediate',
+                  onTap: () {
+                    setState(() => _selectedTimeout = 'immediate');
+                    ref.read(biometricServiceProvider).setLockTimeoutMinutes(0);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTimeoutButton(
+                  key: '1min',
+                  label: l10n.timeout1Min,
+                  isSelected: _selectedTimeout == '1min',
+                  onTap: () {
+                    setState(() => _selectedTimeout = '1min');
+                    ref.read(biometricServiceProvider).setLockTimeoutMinutes(1);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTimeoutButton(
+                  key: '5mins',
+                  label: l10n.timeout5Mins,
+                  isSelected: _selectedTimeout == '5mins',
+                  onTap: () {
+                    setState(() => _selectedTimeout = '5mins');
+                    ref.read(biometricServiceProvider).setLockTimeoutMinutes(5);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPushSettingsCard(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.notifications_none, color: Color(0xFFE85D10), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                l10n.pushSettingsTitle,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          _buildSwitchRow(
+            title: l10n.pushFamily,
+            subtitle: l10n.pushFamilyDesc,
+            value: _pushFamily,
+            onChanged: (v) {
+              setState(() => _pushFamily = v);
+              _syncPushPreferences();
+            },
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+          _buildSwitchRow(
+            title: l10n.pushStranger,
+            subtitle: l10n.pushStrangerDesc,
+            value: _pushStranger,
+            onChanged: (v) {
+              setState(() => _pushStranger = v);
+              _syncPushPreferences();
+            },
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+          _buildSwitchRow(
+            title: l10n.pushSystem,
+            subtitle: l10n.pushSystemDesc,
+            value: _pushSystem,
+            onChanged: (v) {
+              setState(() => _pushSystem = v);
+              _syncPushPreferences();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerInfoCard(HubSightSDK? sdk, AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.dns_rounded, color: Color(0xFFE85D10), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.serverConfigTitle,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ServerConfigScreen(isInitialSetup: false),
+                    ),
+                  );
+                },
+                child: Text(
+                  l10n.changeServer,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE85D10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            sdk?.config.urls.gatewayUrl ?? 'Chưa cấu hình',
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+          ),
+          if (sdk != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Profile: ${sdk.config.metadata.name}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitchRow({
     required String title,
     required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
@@ -778,32 +681,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: Color(0xFF64748B),
-                  height: 1.35,
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 12),
-        Padding(
-          padding: const EdgeInsets.only(top: 2.0),
-          child: CupertinoSwitch(
-            activeColor: const Color(0xFFE85D10),
-            value: value,
-            onChanged: onChanged,
-          ),
+        const SizedBox(width: 8),
+        CupertinoSwitch(
+          value: value,
+          activeTrackColor: const Color(0xFFE85D10),
+          onChanged: onChanged,
         ),
       ],
     );
@@ -816,24 +708,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     VoidCallback? onTap,
   }) {
     return InkWell(
-      onTap: onTap ?? () => setState(() => _selectedTimeout = key),
-      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF4A261) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFF4A261) : const Color(0xFFE2E8F0),
-          ),
+          color: isSelected ? const Color(0xFFE85D10) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : const Color(0xFF64748B),
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
           ),
         ),
       ),

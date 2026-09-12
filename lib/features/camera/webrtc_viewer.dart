@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/network/api_client.dart';
-import '../../core/network/socket_service.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
+import '../../core/network/sdk_provider.dart';
 
 class OverlayBox {
   final double x1;
@@ -70,11 +69,10 @@ class WebRTCViewer extends ConsumerStatefulWidget {
 }
 
 class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
-  final RTCVideoRenderer _renderer = RTCVideoRenderer();
-  RTCPeerConnection? _peerConnection;
-  Timer? _heartbeatTimer;
-  String? _poolStreamName;
-  bool _isDisposed = false;
+  HubSightWebRTCManager? _rtcManager;
+  RTCVideoRenderer? _renderer;
+  StreamSubscription? _statusSub;
+  StreamSubscription? _socketSub;
 
   bool _isInitializing = true;
   String? _errorMessage;
@@ -82,66 +80,31 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   bool _showTrace = false;
 
   List<OverlayBox> _boxes = [];
-  StreamSubscription? _socketSub;
-
-  // Stream stats
-  String _resolution = '';
-  String _codec = 'H264';
-  int _renderFps = 0;
 
   @override
   void initState() {
     super.initState();
-    _initRendererAndConnect();
-    _setupSocketOverlayListeners();
+    _initStream();
   }
 
   @override
   void didUpdateWidget(covariant WebRTCViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cameraId != widget.cameraId) {
-      _disconnect();
-      _connectWebRTC();
+      _disposeCurrentManager();
+      _initStream();
     }
   }
 
-  Future<void> _initRendererAndConnect() async {
-    await _renderer.initialize();
-    if (!_isDisposed) {
-      _connectWebRTC();
+  void _initStream() {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) {
+      setState(() {
+        _isInitializing = false;
+        _errorMessage = 'SDK chưa được khởi tạo';
+      });
+      return;
     }
-  }
-
-  void _setupSocketOverlayListeners() {
-    final socket = ref.read(socketServiceProvider);
-    socket.connect();
-
-    // Listen to camera AI events
-    _socketSub = socket.onCameraEvent.listen((data) {
-      if (!mounted || _isDisposed) return;
-      final camId = data['camera_id']?.toString();
-      if (camId != widget.cameraId) return;
-
-      final type = data['event_type']?.toString();
-      if (type == 'vision.person.entered' || type == 'vision.person.update') {
-        final rawBoxes = data['boxes'];
-        if (rawBoxes is List) {
-          setState(() {
-            _boxes = rawBoxes
-                .map((b) => OverlayBox.fromJson(Map<String, dynamic>.from(b as Map)))
-                .toList();
-          });
-        }
-      } else if (type == 'vision.person.left') {
-        setState(() {
-          _boxes = [];
-        });
-      }
-    });
-  }
-
-  Future<void> _connectWebRTC() async {
-    if (_isDisposed) return;
 
     setState(() {
       _isInitializing = true;
@@ -149,142 +112,76 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
     });
     widget.onLiveStatusChange?.call(false);
 
-    try {
-      final configuration = {
-        'iceServers': [
-          {'urls': 'stun:stun.cloudflare.com:3478'},
-          {'urls': 'stun:stun.l.google.com:19302'},
-        ],
-        'bundlePolicy': 'max-bundle',
-        'sdpSemantics': 'unified-plan',
-      };
+    _rtcManager = sdk.createWebRTCManager(widget.cameraId);
 
-      final pc = await createPeerConnection(configuration);
-      _peerConnection = pc;
-
-      pc.onTrack = (event) {
-        if (event.track.kind == 'video') {
-          if (event.streams.isNotEmpty) {
-            _renderer.srcObject = event.streams[0];
-          }
-          if (mounted && !_isDisposed) {
-            setState(() {
-              _isInitializing = false;
-              _resolution = '${_renderer.videoWidth}x${_renderer.videoHeight}';
-            });
-            widget.onLiveStatusChange?.call(true);
-          }
-        }
-      };
-
-      pc.onConnectionState = (state) {
-        if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-          if (mounted && !_isDisposed) {
-            setState(() => _isInitializing = false);
-            widget.onLiveStatusChange?.call(true);
-          }
-        } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
-            state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
-          if (mounted && !_isDisposed) {
-            widget.onLiveStatusChange?.call(false);
-          }
-        }
-      };
-
-      // Add transceivers for Video and Audio (RecvOnly)
-      await pc.addTransceiver(
-        kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
-        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
-      );
-      await pc.addTransceiver(
-        kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
-        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
-      );
-
-      final offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      // Brief pause for local ICE candidates
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      if (_isDisposed) return;
-
-      final apiClient = ref.read(apiClientProvider);
-      final sdpOffer = pc.localDescription?.sdp ?? '';
-
-      // Exchange SDP with backend API Gateway
-      final response = await apiClient.sendWebRtcOffer(widget.cameraId, sdpOffer);
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to negotiate WebRTC: \${response.statusCode}');
-      }
-
-      final answerSdp = response.data.toString();
-      _poolStreamName = response.headers.value('X-Pool-Stream-Name');
-
-      final answer = RTCSessionDescription(answerSdp, 'answer');
-      await pc.setRemoteDescription(answer);
-
-      // Start 15-second heartbeat ping to keep connection pool active
-      if (_poolStreamName != null && !_isDisposed) {
-        _heartbeatTimer?.cancel();
-        _heartbeatTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-          if (_isDisposed || _poolStreamName == null) {
-            timer.cancel();
-            return;
-          }
-          apiClient.sendStreamHeartbeat(widget.cameraId, _poolStreamName!).catchError((_) {});
-        });
-      }
-
-      if (mounted && !_isDisposed) {
-        setState(() => _isInitializing = false);
-        widget.onLiveStatusChange?.call(true);
-      }
-    } catch (e) {
-      debugPrint('WebRTC Connection Error: $e');
-      if (mounted && !_isDisposed) {
+    _statusSub = _rtcManager!.onStatusChanged.listen((status) {
+      if (!mounted) return;
+      if (status == StreamStatus.connected) {
         setState(() {
           _isInitializing = false;
-          _errorMessage = 'Không thể kết nối luồng trực tiếp. Vui lòng kiểm tra camera.';
+          _renderer = _rtcManager!.renderer;
+        });
+        widget.onLiveStatusChange?.call(true);
+      } else if (status == StreamStatus.failed) {
+        setState(() {
+          _isInitializing = false;
+          _errorMessage = 'Không thể kết nối luồng trực tiếp.';
         });
         widget.onLiveStatusChange?.call(false);
       }
-    }
+    });
+
+    _rtcManager!.startStream().then((renderer) {
+      if (mounted) {
+        setState(() {
+          _renderer = renderer;
+          _isInitializing = false;
+        });
+        widget.onLiveStatusChange?.call(true);
+      }
+    }).catchError((e) {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          _errorMessage = 'Lỗi kết nối camera: $e';
+        });
+        widget.onLiveStatusChange?.call(false);
+      }
+    });
+
+    // Listen to AI bounding box events
+    _socketSub = sdk.relay.onAIAlert.listen((event) {
+      if (!mounted || event.cameraId != widget.cameraId) return;
+      if (event.rawPayload != null && event.rawPayload!['boxes'] is List) {
+        final rawBoxes = event.rawPayload!['boxes'] as List;
+        setState(() {
+          _boxes = rawBoxes
+              .map((b) => OverlayBox.fromJson(Map<String, dynamic>.from(b as Map)))
+              .toList();
+        });
+      }
+    });
   }
 
-  void _disconnect() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
-
-    if (_poolStreamName != null) {
-      final name = _poolStreamName!;
-      _poolStreamName = null;
-      ref.read(apiClientProvider).client.post(
-        '/live/${widget.cameraId}/release',
-        queryParameters: {'stream_name': name},
-      ).catchError((_) {});
-    }
-
-    _peerConnection?.close();
-    _peerConnection = null;
-    _renderer.srcObject = null;
+  void _disposeCurrentManager() {
+    _statusSub?.cancel();
+    _socketSub?.cancel();
+    _rtcManager?.stopStream();
+    _rtcManager = null;
+    _renderer = null;
   }
 
   @override
   void dispose() {
-    _isDisposed = true;
-    _socketSub?.cancel();
-    _disconnect();
-    _renderer.dispose();
+    _disposeCurrentManager();
     super.dispose();
   }
 
   void _toggleMute() {
     setState(() {
       _isMuted = !_isMuted;
-      if (_renderer.srcObject != null) {
-        final audioTracks = _renderer.srcObject!.getAudioTracks();
+      if (_renderer?.srcObject != null) {
+        final audioTracks = _renderer!.srcObject!.getAudioTracks();
         for (var track in audioTracks) {
           track.enabled = !_isMuted;
         }
@@ -301,10 +198,10 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. RTC Video Renderer View
-          if (!_isInitializing && _errorMessage == null)
+          // 1. RTC Video Renderer
+          if (!_isInitializing && _errorMessage == null && _renderer != null)
             RTCVideoView(
-              _renderer,
+              _renderer!,
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
             ),
 
@@ -377,7 +274,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               ),
             ),
 
-          // 5. Error Overlay with Retry Button
+          // 5. Error Overlay with Retry
           if (_errorMessage != null)
             Container(
               color: const Color(0xFF0F172A),
@@ -404,7 +301,10 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: _connectWebRTC,
+                      onPressed: () {
+                        _disposeCurrentManager();
+                        _initStream();
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE85D10),
                         foregroundColor: Colors.white,
@@ -419,14 +319,13 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               ),
             ),
 
-          // 6. Bottom Controls Overlay (Mute / Trace / AI Badge)
+          // 6. Bottom Controls (Mute / Trace / AI Badge)
           if (!_isInitializing && _errorMessage == null)
             Positioned(
               bottom: 8,
               right: 8,
               child: Row(
                 children: [
-                  // AI Badge
                   if (widget.enableAi)
                     Container(
                       margin: const EdgeInsets.only(right: 6),
@@ -452,16 +351,13 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                       ),
                     ),
 
-                  // Trace Stats Toggle
                   InkWell(
                     onTap: () => setState(() => _showTrace = !_showTrace),
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _showTrace
-                            ? const Color(0xFFE85D10)
-                            : Colors.black.withOpacity(0.6),
+                        color: _showTrace ? const Color(0xFFE85D10) : Colors.black.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.white24),
                       ),
@@ -484,7 +380,6 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
 
                   const SizedBox(width: 6),
 
-                  // Audio Mute Button
                   InkWell(
                     onTap: _toggleMute,
                     borderRadius: BorderRadius.circular(6),
@@ -506,7 +401,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               ),
             ),
 
-          // 7. Trace Stats HUD Panel
+          // 7. Trace HUD Panel
           if (_showTrace && !_isInitializing && _errorMessage == null)
             Positioned(
               top: 10,
@@ -520,8 +415,8 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
+                  children: const [
+                    Text(
                       'WEBRTC STREAM TRACE',
                       style: TextStyle(
                         color: Color(0xFFF97316),
@@ -529,20 +424,9 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Protocol: WebRTC (WHEP)',
-                      style: const TextStyle(color: Colors.white70, fontSize: 10),
-                    ),
-                    Text(
-                      'Codec: $_codec',
-                      style: const TextStyle(color: Colors.white70, fontSize: 10),
-                    ),
-                    if (_poolStreamName != null)
-                      Text(
-                        'Pool: $_poolStreamName',
-                        style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10),
-                      ),
+                    SizedBox(height: 4),
+                    Text('Protocol: WebRTC (WHEP)', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    Text('Heartbeat: 30s Gateway ping', style: TextStyle(color: Colors.white70, fontSize: 10)),
                   ],
                 ),
               ),
@@ -593,7 +477,6 @@ class BoundingBoxPainter extends CustomPainter {
 
       canvas.drawRect(rect, paint);
 
-      // Draw Keypoints & Skeleton if available
       if (box.keypoints != null && box.keypoints!.length >= 17) {
         final kpts = box.keypoints!;
         final linePaint = Paint()
@@ -627,7 +510,6 @@ class BoundingBoxPainter extends CustomPainter {
         }
       }
 
-      // Draw Label Badge
       final label = box.name ?? box.state ?? '';
       if (label.isNotEmpty) {
         final textSpan = TextSpan(

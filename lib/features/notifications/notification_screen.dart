@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/network/api_client.dart';
-import '../../core/network/socket_service.dart';
+import '../../core/network/sdk_provider.dart';
 import 'models/notification_model.dart';
-import '../camera/playback_screen.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
   const NotificationScreen({super.key});
@@ -26,33 +24,50 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     super.initState();
     _fetchNotifications();
 
-    // Listen for real-time notifications via Socket.IO
-    final socketService = ref.read(socketServiceProvider);
-    socketService.connect();
-    _socketSub = socketService.onNotification.listen((data) {
-      if (!mounted) return;
-      final newNotif = NotificationItem.fromJson(data);
-      setState(() {
-        _notifications.removeWhere((n) => n.id == newNotif.id);
-        _notifications.insert(0, newNotif);
-        _unreadCount++;
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk != null) {
+      sdk.relay.connect();
+      _socketSub = sdk.relay.onAIAlert.listen((data) {
+        if (!mounted) return;
+        _fetchNotifications();
       });
-    });
+    }
   }
 
   Future<void> _fetchNotifications() async {
     setState(() => _isLoading = true);
     try {
-      final response = await ref.read(apiClientProvider).getNotifications();
-      if (mounted) {
-        setState(() {
-          _notifications = response.notifications;
-          _unreadCount = response.unreadCount;
-          _isLoading = false;
-        });
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final response = await sdk.notifications.listNotifications();
+        if (mounted) {
+          setState(() {
+            _notifications = response.items
+                .map((n) => NotificationItem(
+                      id: n.id,
+                      cameraId: n.cameraId,
+                      type: n.type,
+                      title: n.title,
+                      body: n.body,
+                      category: n.category,
+                      memberId: n.memberId,
+                      thumbnailUrl: n.thumbnailUrl,
+                      isRead: n.isRead,
+                      createdAt: n.createdAt.toIso8601String(),
+                    ))
+                .toList();
+            _unreadCount = response.unreadCount;
+            _isLoading = false;
+          });
 
-        if (_notifications.isEmpty) {
+          if (_notifications.isEmpty) {
+            _loadSampleNotifications();
+          }
+        }
+      } else {
+        if (mounted) {
           _loadSampleNotifications();
+          setState(() => _isLoading = false);
         }
       }
     } catch (e) {
@@ -130,7 +145,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       }).toList();
       _unreadCount = (_unreadCount - 1).clamp(0, 999);
     });
-    await ref.read(apiClientProvider).markNotificationRead(item.id);
+    await ref.read(hubsightSdkProvider)?.notifications.markAsRead(item.id);
   }
 
   Future<void> _handleMarkAllRead() async {
@@ -138,7 +153,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
       _unreadCount = 0;
     });
-    await ref.read(apiClientProvider).markAllNotificationsRead();
+    await ref.read(hubsightSdkProvider)?.notifications.markAllAsRead();
   }
 
   Future<void> _handleDelete(String id) async {
@@ -149,7 +164,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       }
       _notifications.removeWhere((n) => n.id == id);
     });
-    await ref.read(apiClientProvider).deleteNotification(id);
+    await ref.read(hubsightSdkProvider)?.notifications.deleteNotification(id);
   }
 
   Future<void> _handleClearAll(AppLocalizations l10n) async {
@@ -177,11 +192,17 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     );
 
     if (confirm == true) {
+      final listCopy = List<NotificationItem>.from(_notifications);
       setState(() {
         _notifications.clear();
         _unreadCount = 0;
       });
-      await ref.read(apiClientProvider).clearAllNotifications();
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        for (var item in listCopy) {
+          await sdk.notifications.deleteNotification(item.id);
+        }
+      }
     }
   }
 

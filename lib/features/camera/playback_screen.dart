@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/models/device_models.dart';
-import '../../core/network/api_client.dart';
-import '../../core/network/socket_service.dart';
+import '../../core/network/sdk_provider.dart';
 import 'models/camera_models.dart';
 import 'webrtc_viewer.dart';
 import '../notifications/notification_screen.dart';
@@ -33,12 +32,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   double _archiveCurrentSeconds = 0.0;
   double _archiveDurationSeconds = 30.0;
   double _playbackSpeed = 1.0;
-  bool _showSpeedMenu = false;
 
   // Mode: 'live' | 'archive'
   String _mode = 'live';
   String _filterPeriod = 'all'; // 'all', 'morning', 'afternoon', 'evening'
-  bool _isTimelineCollapsed = false;
 
   List<RecognitionLog> _recognitionLogs = [];
   bool _isLoadingLogs = false;
@@ -56,128 +53,121 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   Future<void> _initData() async {
     await _fetchCameras();
 
-    final socketService = ref.read(socketServiceProvider);
-    socketService.connect();
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk != null) {
+      sdk.relay.connect();
 
-    _notificationSub = socketService.onNotification.listen((data) {
-      if (!mounted) return;
-      final type = data['type'] ?? 'Alert';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Thông báo: $type')),
-            ],
+      _notificationSub = sdk.relay.onAIAlert.listen((event) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Cảnh báo AI: ${event.eventType} tại camera ${event.cameraId}')),
+              ],
+            ),
+            backgroundColor: const Color(0xFFE85D10),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          backgroundColor: const Color(0xFFE85D10),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    });
-
-    _cameraEventSub = socketService.onCameraEvent.listen((data) {
-      if (!mounted) return;
-      final eventType = data['event_type'];
-      final camId = data['id']?.toString();
-
-      setState(() {
-        _cameras = _cameras.map((c) {
-          if (c.id == camId) {
-            final isStopped = eventType == 'camera.stopped' || (data['is_stopped'] == true);
-            final updatedName = data['name'] ?? c.name;
-            return CameraItem(
-              id: c.id,
-              name: updatedName,
-              host: c.host,
-              brand: c.brand,
-              isActive: c.isActive,
-              isStopped: isStopped,
-              enableAi: c.enableAi,
-              showBbox: c.showBbox,
-            );
-          }
-          return c;
-        }).toList();
-
-        if (_selectedCam?.id == camId) {
-          final isStopped = eventType == 'camera.stopped' || (data['is_stopped'] == true);
-          _selectedCam = CameraItem(
-            id: _selectedCam!.id,
-            name: data['name'] ?? _selectedCam!.name,
-            host: _selectedCam!.host,
-            brand: _selectedCam!.brand,
-            isActive: _selectedCam!.isActive,
-            isStopped: isStopped,
-            enableAi: _selectedCam!.enableAi,
-            showBbox: _selectedCam!.showBbox,
-          );
-        }
+        );
       });
 
-      // Camera stopped prompt
-      if (eventType == 'camera.stopped' && data['alternative_id'] != null) {
-        _showAlternativeCameraDialog(
-          cameraName: data['name'] ?? 'Camera',
-          alternativeId: data['alternative_id'],
-          alternativeName: data['alternative_name'] ?? 'Alternative Camera',
-        );
-      }
-    });
+      _cameraEventSub = sdk.relay.onCameraStatus.listen((event) {
+        if (!mounted) return;
+        final camId = event.cameraId;
+        final isStopped = !event.isOnline;
+
+        setState(() {
+          _cameras = _cameras.map((c) {
+            if (c.id == camId) {
+              return CameraItem(
+                id: c.id,
+                name: c.name,
+                host: c.host,
+                brand: c.brand,
+                isActive: event.isOnline,
+                isStopped: isStopped,
+                enableAi: c.enableAi,
+                showBbox: c.showBbox,
+              );
+            }
+            return c;
+          }).toList();
+
+          if (_selectedCam?.id == camId) {
+            _selectedCam = CameraItem(
+              id: _selectedCam!.id,
+              name: _selectedCam!.name,
+              host: _selectedCam!.host,
+              brand: _selectedCam!.brand,
+              isActive: event.isOnline,
+              isStopped: isStopped,
+              enableAi: _selectedCam!.enableAi,
+              showBbox: _selectedCam!.showBbox,
+            );
+          }
+        });
+      });
+    }
   }
 
   Future<void> _fetchCameras() async {
     setState(() => _isLoadingCameras = true);
     try {
-      final cameras = await ref.read(apiClientProvider).getCameras();
-      if (mounted) {
-        setState(() {
-          _cameras = cameras;
-          if (cameras.isNotEmpty && _selectedCam == null) {
-            _selectedCam = cameras.firstWhere((c) => !c.isStopped, orElse: () => cameras.first);
-          }
-          _isLoadingCameras = false;
-        });
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final cameras = await sdk.cameras.listCameras();
+        if (mounted) {
+          setState(() {
+            _cameras = cameras.map((c) => CameraItem(
+              id: c.id,
+              name: c.name,
+              host: c.host,
+              isActive: c.isActive,
+              isStopped: c.isStopped,
+              enableAi: c.enableAI,
+            )).toList();
 
-        if (_selectedCam != null) {
-          _fetchAvailableDays();
-          _fetchTimeline();
-          _fetchRecognitionLogs();
+            if (_cameras.isNotEmpty && _selectedCam == null) {
+              _selectedCam = _cameras.firstWhere((c) => !c.isStopped, orElse: () => _cameras.first);
+            }
+            _isLoadingCameras = false;
+          });
+
+          if (_selectedCam != null) {
+            _fetchAvailableDays();
+            _fetchTimeline();
+            _fetchRecognitionLogs();
+          }
         }
       }
     } catch (e) {
       debugPrint('Error fetching cameras: $e');
-      if (mounted) {
-        if (_cameras.isEmpty) {
-          final fallbackCam = CameraItem(
-            id: 'cam_facetime',
-            name: 'Facetime HD Cam',
-            isStopped: true,
-          );
-          setState(() {
-            _cameras = [fallbackCam];
-            _selectedCam = fallbackCam;
-            _isLoadingCameras = false;
-          });
-        } else {
-          setState(() => _isLoadingCameras = false);
-        }
-      }
+      if (mounted) setState(() => _isLoadingCameras = false);
     }
   }
 
   Future<void> _fetchAvailableDays() async {
     if (_selectedCam == null) return;
     try {
-      final days = await ref.read(apiClientProvider).getAvailableDays(
-            _selectedCam!.id,
-            _selectedDate.year,
-            _selectedDate.month,
-          );
-      if (mounted) {
-        setState(() => _availableDays = days);
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final calendar = await sdk.archive.getCalendar(
+          cameraId: _selectedCam!.id,
+          year: _selectedDate.year,
+          month: _selectedDate.month,
+        );
+        if (mounted) {
+          setState(() {
+            _availableDays = calendar.availableDays
+                .map((d) => DateTime.tryParse(d)?.day ?? int.tryParse(d) ?? 0)
+                .where((day) => day > 0)
+                .toList();
+          });
+        }
       }
     } catch (_) {}
   }
@@ -187,25 +177,43 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     setState(() => _isLoadingTimeline = true);
 
     try {
-      final recordings = await ref.read(apiClientProvider).getTimelineRecordings(
-            _selectedCam!.id,
-            _selectedDate,
-          );
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final from = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 0, 0, 0);
+        final to = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day, 23, 59, 59);
 
-      if (mounted) {
-        setState(() {
-          _recordings = recordings;
-          _isLoadingTimeline = false;
-          if (recordings.isNotEmpty) {
-            _activeRecording ??= recordings.first;
-            _archiveDurationSeconds = (_activeRecording!.durationSeconds > 0
-                    ? _activeRecording!.durationSeconds
-                    : 30)
-                .toDouble();
-          } else {
-            _activeRecording = null;
-          }
-        });
+        final segments = await sdk.archive.getTimeline(
+          cameraId: _selectedCam!.id,
+          from: from,
+          to: to,
+        );
+
+        if (mounted) {
+          setState(() {
+            _recordings = segments.map((s) => Recording(
+              id: s.id,
+              cameraId: s.cameraId,
+              startAt: s.startAt.toIso8601String(),
+              endAt: s.endAt.toIso8601String(),
+              durationSeconds: s.durationSeconds,
+              filePath: 'recording_${s.id}.mp4',
+              thumbnailPath: s.thumbnailUrl,
+              sizeBytes: s.sizeBytes,
+              createdAt: s.startAt.toIso8601String(),
+            )).toList();
+
+            _isLoadingTimeline = false;
+            if (_recordings.isNotEmpty) {
+              _activeRecording ??= _recordings.first;
+              _archiveDurationSeconds = (_activeRecording!.durationSeconds > 0
+                      ? _activeRecording!.durationSeconds
+                      : 30)
+                  .toDouble();
+            } else {
+              _activeRecording = null;
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching timeline: $e');
@@ -217,53 +225,22 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     if (_selectedCam == null) return;
     setState(() => _isLoadingLogs = true);
     try {
-      final logs = await ref.read(apiClientProvider).getRecognitionLogs(_selectedCam!.id);
-      if (mounted) {
-        setState(() {
-          _recognitionLogs = logs;
-          _isLoadingLogs = false;
-        });
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        final res = await sdk.client.get('/cameras/${_selectedCam!.id}/recognition-logs');
+        if (mounted && res is List) {
+          setState(() {
+            _recognitionLogs = res.map((e) => RecognitionLog.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+            _isLoadingLogs = false;
+          });
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isLoadingLogs = false);
     }
   }
 
-  void _showAlternativeCameraDialog({
-    required String cameraName,
-    required String alternativeId,
-    required String alternativeName,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Camera đã tắt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text('“$cameraName” hiện đang tắt. Bạn có muốn chuyển sang “$alternativeName” không?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Ở lại', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE85D10),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              final target = _cameras.firstWhere(
-                (c) => c.id == alternativeId,
-                orElse: () => CameraItem(id: alternativeId, name: alternativeName),
-              );
-              _onSelectCamera(target);
-            },
-            child: const Text('Chuyển camera'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _onSelectCamera(CameraItem cam) {
     setState(() {
@@ -891,7 +868,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                _recordings.isEmpty ? l10n.noData : l10n.recordsCount(_recordings.length),
+                _isLoadingTimeline
+                    ? l10n.loading
+                    : (_recordings.isEmpty
+                        ? l10n.noData
+                        : l10n.recordsCount(_recordings.length)),
                 style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF94A3B8),
@@ -924,26 +905,46 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               ),
               const Divider(height: 1),
               Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _cameras.length,
-                  itemBuilder: (context, index) {
-                    final cam = _cameras[index];
-                    final isSelected = cam.id == _selectedCam?.id;
-                    return ListTile(
-                      leading: Icon(
-                        cam.isStopped ? Icons.videocam_off_outlined : Icons.videocam_outlined,
-                        color: isSelected ? const Color(0xFFE85D10) : Colors.grey,
+                child: _isLoadingCameras
+                    ? const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFE85D10),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _cameras.length,
+                        itemBuilder: (context, index) {
+                          final cam = _cameras[index];
+                          final isSelected = cam.id == _selectedCam?.id;
+                          return ListTile(
+                            leading: Icon(
+                              cam.isStopped
+                                  ? Icons.videocam_off_outlined
+                                  : Icons.videocam_outlined,
+                              color: isSelected
+                                  ? const Color(0xFFE85D10)
+                                  : Colors.grey,
+                            ),
+                            title: Text(cam.name,
+                                style: TextStyle(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal)),
+                            trailing: isSelected
+                                ? const Icon(Icons.check,
+                                    color: Color(0xFFE85D10))
+                                : null,
+                            onTap: () {
+                              Navigator.pop(context);
+                              _onSelectCamera(cam);
+                            },
+                          );
+                        },
                       ),
-                      title: Text(cam.name, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                      trailing: isSelected ? const Icon(Icons.check, color: Color(0xFFE85D10)) : null,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _onSelectCamera(cam);
-                      },
-                    );
-                  },
-                ),
               ),
             ],
           ),
