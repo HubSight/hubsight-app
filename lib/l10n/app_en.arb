@@ -208,5 +208,21 @@
   "themeDark": "Dark",
   "themeSystemDesc": "Automatically matches device setting",
   "themeLightDesc": "Optimized for well-lit environments",
-  "themeDarkDesc": "Easy on the eyes and saves battery on OLED"
+  "themeDarkDesc": "Easy on the eyes and saves battery on OLED",
+  "ptzControl": "PTZ Control",
+  "ptzPadTitle": "Pan / Tilt / Zoom Control",
+  "onvifBadge": "ONVIF",
+  "ptzBadge": "PTZ",
+  "onvifDiscovery": "ONVIF Discovery",
+  "onvifDiscoverySubtitle": "Probe network cameras, firmware, profiles & PTZ",
+  "probeCamera": "Probe Camera",
+  "probeHost": "Host / IP Address",
+  "probePort": "ONVIF Port",
+  "probeUsername": "ONVIF Username",
+  "probePassword": "ONVIF Password",
+  "probeSuccess": "ONVIF probe successful",
+  "probeFailed": "ONVIF probe failed",
+  "presetsTitle": "Preset Positions",
+  "addPreset": "Save Position",
+  "presetNamePrompt": "Enter preset point name:"
 }

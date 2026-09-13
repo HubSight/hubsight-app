@@ -94,5 +94,74 @@ void main() {
       expect(find.text('Live'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('toggles fullscreen mode with standard icon and controls', (tester) async {
+      await tester.pumpWidget(buildPlaybackScreenHost());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Locate standard fullscreen button in player controls
+      final fsButton = find.byKey(const ValueKey('webrtc-fullscreen-button'));
+      expect(fsButton, findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen_rounded), findsWidgets);
+
+      // Tap to enter fullscreen
+      await tester.tap(fsButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // HubSight title in AppBar should now be hidden in fullscreen mode
+      expect(find.text('HubSight'), findsNothing);
+
+      // Standard exit fullscreen icon and back button should be visible
+      expect(find.byIcon(Icons.fullscreen_exit_rounded), findsWidgets);
+      expect(find.byKey(const ValueKey('fullscreen-back-button')), findsOneWidget);
+
+      // Tap exit fullscreen
+      await tester.tap(find.byKey(const ValueKey('fullscreen-back-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Should return to normal layout
+      expect(find.text('HubSight'), findsOneWidget);
+      expect(find.byIcon(Icons.fullscreen_rounded), findsWidgets);
+    });
+
+    testWidgets('toggles fullscreen mode in archive playback player', (tester) async {
+      await tester.pumpWidget(buildPlaybackScreenHost());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Tap date selector to switch to archive mode
+      await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Confirm date picker dialog (tap OK)
+      await tester.tap(find.text('OK'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Archive player should now be visible with its fullscreen button
+      final archiveFsButton = find.byKey(const ValueKey('archive-fullscreen-button'));
+      expect(archiveFsButton, findsOneWidget);
+
+      // Tap archive fullscreen button
+      await tester.tap(archiveFsButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // App bar should be hidden and archive fullscreen back button visible
+      expect(find.text('HubSight'), findsNothing);
+      expect(find.byKey(const ValueKey('archive-fullscreen-back-button')), findsOneWidget);
+
+      // Tap back button to exit fullscreen
+      await tester.tap(find.byKey(const ValueKey('archive-fullscreen-back-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Back in normal layout
+      expect(find.text('HubSight'), findsOneWidget);
+    });
   });
 }

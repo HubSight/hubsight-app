@@ -95,3 +95,4 @@ coverage/
 !.env.example
 
 build/
+.zed/

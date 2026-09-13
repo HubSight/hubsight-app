@@ -6,7 +6,6 @@ import 'package:hubsight_sdk/hubsight_sdk.dart';
 import 'core/network/sdk_provider.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/fcm_service.dart';
-import 'core/services/in_app_notification_service.dart';
 import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -53,9 +52,6 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
 
     // Initialize SDK, FCM push notifications & App lock
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      ref
-          .read(inAppNotificationServiceProvider)
-          .attachNavigatorKey(rootNavigatorKey);
       ref.read(fcmServiceProvider).initialize();
 
       // Restore SDK from storage if previously enrolled

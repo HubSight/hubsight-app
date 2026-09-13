@@ -135,29 +135,3 @@ final hubsightSdkProvider =
     StateNotifierProvider<SdkStateNotifier, HubSightSDK?>((ref) {
   return SdkStateNotifier(ref);
 });
-
-/// Convenience accessor for [HubSightAuthManager].
-final authManagerProvider = Provider<HubSightAuthManager?>((ref) {
-  return ref.watch(hubsightSdkProvider)?.auth;
-});
-
-/// Convenience accessor for [HubSightCameraService].
-final cameraServiceProvider = Provider<HubSightCameraService?>((ref) {
-  return ref.watch(hubsightSdkProvider)?.cameras;
-});
-
-/// Convenience accessor for [HubSightArchiveService].
-final archiveServiceProvider = Provider<HubSightArchiveService?>((ref) {
-  return ref.watch(hubsightSdkProvider)?.archive;
-});
-
-/// Convenience accessor for [HubSightNotificationService].
-final notificationServiceProvider =
-    Provider<HubSightNotificationService?>((ref) {
-  return ref.watch(hubsightSdkProvider)?.notifications;
-});
-
-/// Convenience accessor for [HubSightRelayClient].
-final relayClientProvider = Provider<HubSightRelayClient?>((ref) {
-  return ref.watch(hubsightSdkProvider)?.relay;
-});

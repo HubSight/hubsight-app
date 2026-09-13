@@ -12,6 +12,7 @@ import '../../core/services/fcm_service.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
 import '../config/server_config_screen.dart';
+import '../camera/onvif_discovery_sheet.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
@@ -502,31 +503,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: context.cardAdaptive,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: context.borderAdaptive, width: 1),
+        scrolledUnderElevation: 0,
+        shape: const Border(),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: HubSightGradients.accentHeaderAdaptive(context),
+            boxShadow: [
+              BoxShadow(
+                color: HubSightColors.primary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
         ),
         automaticallyImplyLeading: false,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: Icon(Icons.arrow_back, color: context.textPrimaryAdaptive),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               )
             : null,
         titleSpacing: 20,
         title: Text(
           l10n.tabSettings,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.4,
-            color: context.textPrimaryAdaptive,
+            color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryAdaptive, size: 22),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
             tooltip: l10n.loading,
             onPressed: () {
               HapticFeedback.lightImpact();
@@ -626,14 +639,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildPushSettingsSection(l10n),
             const SizedBox(height: 14),
 
-            // 8. Server & Container Config
+            // 8. ONVIF Device Discovery
+            _buildSectionHeader(l10n.onvifDiscovery),
+            _buildOnvifSection(sdk, l10n),
+            const SizedBox(height: 14),
+
+            // 9. Server & Container Config
             _buildSectionHeader(l10n.serverConfigTitle),
             _buildServerInfoSection(sdk, l10n),
             const SizedBox(height: 22),
 
-            // 9. Safe Logout Action Section
+            // 10. Safe Logout Action Section
             _buildLogoutSection(l10n),
-            const SizedBox(height: 40),
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -1488,7 +1506,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // --- 9. Safe Logout Action Section ---
+  // --- 8. ONVIF Device Discovery Section ---
+  Widget _buildOnvifSection(HubSightSDK? sdk, AppLocalizations l10n) {
+    return _buildGroupCard(
+      children: [
+        _buildSettingTile(
+          icon: _buildSettingIcon(Icons.radar_rounded, const Color(0xFF10B981)),
+          title: l10n.onvifDiscovery,
+          subtitle: l10n.onvifDiscoverySubtitle,
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+          onTap: () async {
+            List<Camera> cameras = [];
+            if (sdk != null) {
+              try {
+                cameras = await sdk.cameras.listCameras();
+              } catch (_) {}
+            }
+            if (mounted) {
+              OnvifDiscoverySheet.show(context, existingCameras: cameras);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  // --- 10. Safe Logout Action Section ---
   Widget _buildLogoutSection(AppLocalizations l10n) {
     return Column(
       children: [

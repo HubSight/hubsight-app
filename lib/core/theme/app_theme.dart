@@ -78,6 +78,37 @@ class HubSightColors {
       Theme.of(context).brightness == Brightness.dark ? textMuted : textMutedLight;
 }
 
+/// HubSight Brand Gradients
+class HubSightGradients {
+  HubSightGradients._();
+
+  /// Vibrant Brand Accent Gradient overflowing into Status Bar / Dynamic Island
+  static const LinearGradient accentHeader = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFF97316), // orange-500
+      Color(0xFFEA580C), // orange-600
+    ],
+  );
+
+  /// Deep warm obsidian dark header with orange undertone
+  static const LinearGradient accentHeaderDark = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFFD9480F), // rich vibrant dark orange
+      Color(0xFF9A3412), // deep orange-800
+    ],
+  );
+
+  /// Adaptive accent header gradient based on theme
+  static LinearGradient accentHeaderAdaptive(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? accentHeaderDark : accentHeader;
+  }
+}
+
 /// HubSight Exact Border Radiuses
 /// From webapp `tailwind.config.js`:
 /// - `xs`, `sm`: 2px
@@ -140,9 +171,6 @@ class AppTheme {
         foregroundColor: HubSightColors.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: HubSightColors.borderDark, width: 1.0),
-        ),
       ),
       drawerTheme: const DrawerThemeData(
         backgroundColor: HubSightColors.cardDark,
@@ -277,9 +305,6 @@ class AppTheme {
         foregroundColor: HubSightColors.textPrimaryLight,
         elevation: 0,
         scrolledUnderElevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: HubSightColors.borderLight, width: 1.0),
-        ),
       ),
       drawerTheme: const DrawerThemeData(
         backgroundColor: HubSightColors.cardLight,

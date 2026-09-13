@@ -8,6 +8,9 @@ import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
 import 'models/recognition_log.dart';
 import 'webrtc_viewer.dart';
+import 'ptz_bottom_sheet.dart';
+import 'onvif_discovery_sheet.dart';
+import '../common/main_tab_screen.dart';
 import '../../core/theme/app_theme.dart';
 
 class PlaybackScreen extends ConsumerStatefulWidget {
@@ -33,10 +36,49 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   double _archiveCurrentSeconds = 0.0;
   double _archiveDurationSeconds = 30.0;
   double _playbackSpeed = 1.0;
+  bool _isFullscreen = false;
+  Orientation? _lastOrientation;
+  final GlobalKey _liveViewerKey = GlobalKey();
+
+  Future<void> _toggleFullscreen() async {
+    final next = !_isFullscreen;
+    setState(() => _isFullscreen = next);
+    ref.read(isFullScreenPlayerProvider.notifier).state = next;
+
+    if (next) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Re-enable device orientation sensors after returning to portrait
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted && !_isFullscreen) {
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        }
+      });
+    }
+  }
+
+  void _openPtzController() {
+    if (_selectedCam == null) return;
+    HapticFeedback.lightImpact();
+    PtzBottomSheet.show(context, camera: _selectedCam!);
+  }
 
   // Mode: 'live' | 'archive'
   String _mode = 'live';
   String _filterPeriod = 'all'; // 'all', 'morning', 'afternoon', 'evening'
+  int _streamReloadIndex = 0;
 
   List<RecognitionLog> _recognitionLogs = [];
   bool _isLoadingLogs = false;
@@ -49,6 +91,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _initData();
   }
 
@@ -307,6 +354,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
   @override
   void dispose() {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _cameraScrollController.dispose();
     _notificationSub?.cancel();
     _cameraEventSub?.cancel();
@@ -338,32 +387,95 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     final isCamStopped = _selectedCam?.isStopped ?? false;
     final dateFormatted = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
+    final orientation = MediaQuery.of(context).orientation;
+    if (_lastOrientation != orientation) {
+      final prev = _lastOrientation;
+      _lastOrientation = orientation;
+      if (prev != null) {
+        if (orientation == Orientation.landscape && !_isFullscreen) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_isFullscreen) {
+              setState(() => _isFullscreen = true);
+              ref.read(isFullScreenPlayerProvider.notifier).state = true;
+              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+            }
+          });
+        } else if (orientation == Orientation.portrait && _isFullscreen) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _isFullscreen) {
+              setState(() => _isFullscreen = false);
+              ref.read(isFullScreenPlayerProvider.notifier).state = false;
+              SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+            }
+          });
+        }
+      }
+    }
+
+    if (_isFullscreen) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) {
+            _toggleFullscreen();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: SafeArea(
+            top: false,
+            bottom: false,
+            left: true,
+            right: true,
+            child: SizedBox.expand(
+              child: _buildVideoPlayerSection(isCamStopped, l10n, isFullscreen: true),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: context.cardAdaptive,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: context.borderAdaptive, width: 1),
+        scrolledUnderElevation: 0,
+        shape: const Border(),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: HubSightGradients.accentHeaderAdaptive(context),
+            boxShadow: [
+              BoxShadow(
+                color: HubSightColors.primary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
         ),
         automaticallyImplyLeading: false,
         titleSpacing: 20,
-        title: Text(
+        title: const Text(
           'HubSight',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.4,
-            color: context.textPrimaryAdaptive,
+            color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryAdaptive, size: 22),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
             tooltip: l10n.loading,
             onPressed: () {
               HapticFeedback.lightImpact();
+              setState(() {
+                _streamReloadIndex++;
+              });
               _fetchCameras();
               _fetchAvailableDays();
               _fetchTimeline();
@@ -374,6 +486,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          setState(() {
+            _streamReloadIndex++;
+          });
           await _fetchCameras();
           await _fetchAvailableDays();
           await _fetchTimeline();
@@ -401,7 +516,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               // 4. Live Activity & Recognition Section
               _buildActivitySection(l10n),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -410,69 +525,135 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   }
 
   // --- 1. Video Player Section (16:9 Widescreen) ---
-  Widget _buildVideoPlayerSection(bool isStopped, AppLocalizations l10n) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Container(
-        color: Colors.black,
-        child: ClipRect(
-          child: isStopped && _mode == 'live'
-              ? _buildStoppedCameraState(l10n)
-              : _mode == 'live'
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        WebRTCViewer(
-                          cameraId: _selectedCam?.id ?? '',
-                          enableAi: _selectedCam?.enableAI ?? true,
-                          showBbox: true,
+  Widget _buildVideoPlayerSection(bool isStopped, AppLocalizations l10n, {bool isFullscreen = false}) {
+    final playerWidget = Container(
+      color: Colors.black,
+      child: isStopped && _mode == 'live'
+          ? _buildStoppedCameraState(l10n)
+          : _mode == 'live'
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    WebRTCViewer(
+                      key: _liveViewerKey,
+                      cameraId: _selectedCam?.id ?? '',
+                      cameraName: _selectedCam?.name,
+                      enableAi: _selectedCam?.enableAI ?? true,
+                      showBbox: true,
+                      isFullscreen: isFullscreen,
+                      onToggleFullscreen: _toggleFullscreen,
+                      streamReloadIndex: _streamReloadIndex,
+                      hasPtz: _selectedCam?.onvifPtzSupported ?? false,
+                      onOpenPtz: _openPtzController,
+                    ),
+                    // Top Video Info Bar (portrait only)
+                    if (!isFullscreen)
+                      Positioned(
+                        top: 10,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _selectedCam?.name ?? 'LIVE',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              if (_selectedCam?.onvifPtzSupported == true) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF60A5FA).withValues(alpha: 0.5)),
+                                  ),
+                                  child: const Text(
+                                    'PTZ',
+                                    style: TextStyle(
+                                      color: Color(0xFF93C5FD),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                        // Top Video Info Bar
-                        Positioned(
-                          top: 10,
-                          left: 12,
+                      ),
+                    // Top-right PTZ Controller Shortcut Button (portrait only)
+                    if (!isFullscreen && _selectedCam?.onvifPtzSupported == true)
+                      Positioned(
+                        top: 10,
+                        right: 12,
+                        child: InkWell(
+                          key: const Key('playback-ptz-action-button'),
+                          onTap: _openPtzController,
+                          borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.65),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white12),
+                              border: Border.all(color: const Color(0xFF60A5FA).withValues(alpha: 0.5)),
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF10B981),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
+                                Icon(Icons.control_camera_rounded, color: Color(0xFF60A5FA), size: 14),
+                                SizedBox(width: 4),
                                 Text(
-                                  _selectedCam?.name ?? 'LIVE',
-                                  style: const TextStyle(
+                                  'PTZ',
+                                  style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.3,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ],
-                    )
-                  : _buildArchiveVideoPlayer(l10n),
-        ),
-      ),
+                      ),
+                  ],
+                )
+              : _buildArchiveVideoPlayer(l10n, isFullscreen: isFullscreen),
+    );
+
+    if (isFullscreen) {
+      return playerWidget;
+    }
+
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: playerWidget,
     );
   }
 
   // --- Archive Video Player with YouTube-style Controls ---
-  Widget _buildArchiveVideoPlayer(AppLocalizations l10n) {
+  Widget _buildArchiveVideoPlayer(AppLocalizations l10n, {bool isFullscreen = false}) {
     final progress = _archiveDurationSeconds > 0
         ? (_archiveCurrentSeconds / _archiveDurationSeconds).clamp(0.0, 1.0)
         : 0.0;
@@ -517,25 +698,47 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Start - End Segment Time
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    borderRadius: HubSightRadius.roundedXl,
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: Text(
-                    _activeRecording != null
-                        ? DateFormat('HH:mm:ss').format(_activeRecording!.startAt)
-                        : '00:00:00',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
+                // Start - End Segment Time & Fullscreen Back Button
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isFullscreen) ...[
+                      InkWell(
+                        key: const Key('archive-fullscreen-back-button'),
+                        onTap: _toggleFullscreen,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Text(
+                        _activeRecording != null
+                            ? DateFormat('HH:mm:ss').format(_activeRecording!.startAt)
+                            : '00:00:00',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
 
                 // Switch to Live Button
@@ -635,34 +838,58 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       ],
                     ),
 
-                    // Speed Selector
-                    PopupMenuButton<double>(
-                      initialValue: _playbackSpeed,
-                      color: context.cardAdaptive,
-                      onSelected: (rate) {
-                        setState(() => _playbackSpeed = rate);
-                      },
-                      itemBuilder: (context) => [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((rate) {
-                        return PopupMenuItem<double>(
-                          value: rate,
-                          child: Text('${rate}x', style: TextStyle(
-                            fontWeight: _playbackSpeed == rate ? FontWeight.bold : FontWeight.normal,
-                            color: _playbackSpeed == rate ? HubSightColors.primary : context.textPrimaryAdaptive,
-                          )),
-                        );
-                      }).toList(),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.65),
-                          borderRadius: HubSightRadius.roundedXl,
-                          border: Border.all(color: Colors.white24),
+                    // Speed Selector & Fullscreen Toggle
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PopupMenuButton<double>(
+                          initialValue: _playbackSpeed,
+                          color: context.cardAdaptive,
+                          onSelected: (rate) {
+                            setState(() => _playbackSpeed = rate);
+                          },
+                          itemBuilder: (context) => [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((rate) {
+                            return PopupMenuItem<double>(
+                              value: rate,
+                              child: Text('${rate}x', style: TextStyle(
+                                fontWeight: _playbackSpeed == rate ? FontWeight.bold : FontWeight.normal,
+                                color: _playbackSpeed == rate ? HubSightColors.primary : context.textPrimaryAdaptive,
+                              )),
+                            );
+                          }).toList(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: HubSightRadius.roundedXl,
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Text(
+                              '${_playbackSpeed}x',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          '${_playbackSpeed}x',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          key: const Key('archive-fullscreen-button'),
+                          onTap: _toggleFullscreen,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: HubSightRadius.roundedXl,
+                              border: Border.all(color: Colors.white24),
+                            ),
+                            child: Icon(
+                              isFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -838,6 +1065,14 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           : context.textPrimaryAdaptive,
                     ),
                   ),
+                  if (cam.onvifPtzSupported) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.control_camera_rounded,
+                      size: 12,
+                      color: isSelected ? HubSightColors.primary : const Color(0xFF60A5FA),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -893,14 +1128,47 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   ? HubSightColors.primary
                                   : context.textMutedAdaptive,
                             ),
-                            title: Text(cam.name,
-                                style: TextStyle(
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: isSelected
-                                        ? HubSightColors.primary
-                                        : context.textPrimaryAdaptive)),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    cam.name,
+                                    style: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected ? HubSightColors.primary : context.textPrimaryAdaptive,
+                                    ),
+                                  ),
+                                ),
+                                if (cam.onvifPtzSupported)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+                                    ),
+                                    child: const Text(
+                                      'PTZ',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6)),
+                                    ),
+                                  ),
+                                if (cam.onvifEnabled)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                    ),
+                                    child: const Text(
+                                      'ONVIF',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                                    ),
+                                  ),
+                              ],
+                            ),
                             trailing: isSelected
                                 ? const Icon(Icons.check,
                                     color: HubSightColors.primary)
@@ -912,6 +1180,38 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           );
                         },
                       ),
+              ),
+              Divider(height: 1, color: context.borderAdaptive),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.radar_rounded, color: Color(0xFF10B981), size: 18),
+                ),
+                title: Text(
+                  l10n.onvifDiscovery,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimaryAdaptive,
+                  ),
+                ),
+                subtitle: Text(
+                  l10n.onvifDiscoverySubtitle,
+                  style: TextStyle(fontSize: 11, color: context.textMutedAdaptive),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                onTap: () {
+                  Navigator.pop(context);
+                  OnvifDiscoverySheet.show(
+                    context,
+                    existingCameras: _cameras,
+                    initialCamera: _selectedCam,
+                  );
+                },
               ),
             ],
           ),

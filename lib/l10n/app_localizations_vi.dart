@@ -710,4 +710,53 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get themeDarkDesc => 'Dịu mắt, tiết kiệm pin cho màn hình OLED';
+
+  @override
+  String get ptzControl => 'Điều khiển PTZ';
+
+  @override
+  String get ptzPadTitle => 'Điều khiển Xoay / Thu phóng PTZ';
+
+  @override
+  String get onvifBadge => 'ONVIF';
+
+  @override
+  String get ptzBadge => 'PTZ';
+
+  @override
+  String get onvifDiscovery => 'Dò tìm thiết bị ONVIF';
+
+  @override
+  String get onvifDiscoverySubtitle =>
+      'Quét thông tin camera mạng, firmware, cấu hình & PTZ';
+
+  @override
+  String get probeCamera => 'Quét thiết bị';
+
+  @override
+  String get probeHost => 'Địa chỉ IP / Host';
+
+  @override
+  String get probePort => 'Cổng ONVIF';
+
+  @override
+  String get probeUsername => 'Tài khoản ONVIF';
+
+  @override
+  String get probePassword => 'Mật khẩu ONVIF';
+
+  @override
+  String get probeSuccess => 'Dò tìm ONVIF thành công';
+
+  @override
+  String get probeFailed => 'Dò tìm ONVIF thất bại';
+
+  @override
+  String get presetsTitle => 'Điểm nhớ vị trí';
+
+  @override
+  String get addPreset => 'Lưu góc hiện tại';
+
+  @override
+  String get presetNamePrompt => 'Nhập tên điểm nhớ vị trí:';
 }

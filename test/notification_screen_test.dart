@@ -6,7 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NotificationScreen Widget Tests', () {
-    testWidgets('renders NotificationScreen with dark theme and filter tabs', (tester) async {
+    testWidgets('renders NotificationScreen with dark theme and filter tabs',
+        (tester) async {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
@@ -25,6 +26,7 @@ void main() {
       expect(find.text('Thông báo'), findsOneWidget);
       expect(find.textContaining('Tất cả'), findsOneWidget);
       expect(find.textContaining('Chưa đọc'), findsOneWidget);
+      expect(find.byType(Dismissible), findsNothing);
     });
   });
 }

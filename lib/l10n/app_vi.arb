@@ -208,5 +208,21 @@
   "themeDark": "Tối",
   "themeSystemDesc": "Tự động đồng bộ theo hệ thống",
   "themeLightDesc": "Tối ưu cho môi trường nhiều ánh sáng",
-  "themeDarkDesc": "Dịu mắt, tiết kiệm pin cho màn hình OLED"
+  "themeDarkDesc": "Dịu mắt, tiết kiệm pin cho màn hình OLED",
+  "ptzControl": "Điều khiển PTZ",
+  "ptzPadTitle": "Điều khiển Xoay / Thu phóng PTZ",
+  "onvifBadge": "ONVIF",
+  "ptzBadge": "PTZ",
+  "onvifDiscovery": "Dò tìm thiết bị ONVIF",
+  "onvifDiscoverySubtitle": "Quét thông tin camera mạng, firmware, cấu hình & PTZ",
+  "probeCamera": "Quét thiết bị",
+  "probeHost": "Địa chỉ IP / Host",
+  "probePort": "Cổng ONVIF",
+  "probeUsername": "Tài khoản ONVIF",
+  "probePassword": "Mật khẩu ONVIF",
+  "probeSuccess": "Dò tìm ONVIF thành công",
+  "probeFailed": "Dò tìm ONVIF thất bại",
+  "presetsTitle": "Điểm nhớ vị trí",
+  "addPreset": "Lưu góc hiện tại",
+  "presetNamePrompt": "Nhập tên điểm nhớ vị trí:"
 }

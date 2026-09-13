@@ -706,4 +706,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themeDarkDesc => 'Easy on the eyes and saves battery on OLED';
+
+  @override
+  String get ptzControl => 'PTZ Control';
+
+  @override
+  String get ptzPadTitle => 'Pan / Tilt / Zoom Control';
+
+  @override
+  String get onvifBadge => 'ONVIF';
+
+  @override
+  String get ptzBadge => 'PTZ';
+
+  @override
+  String get onvifDiscovery => 'ONVIF Discovery';
+
+  @override
+  String get onvifDiscoverySubtitle =>
+      'Probe network cameras, firmware, profiles & PTZ';
+
+  @override
+  String get probeCamera => 'Probe Camera';
+
+  @override
+  String get probeHost => 'Host / IP Address';
+
+  @override
+  String get probePort => 'ONVIF Port';
+
+  @override
+  String get probeUsername => 'ONVIF Username';
+
+  @override
+  String get probePassword => 'ONVIF Password';
+
+  @override
+  String get probeSuccess => 'ONVIF probe successful';
+
+  @override
+  String get probeFailed => 'ONVIF probe failed';
+
+  @override
+  String get presetsTitle => 'Preset Positions';
+
+  @override
+  String get addPreset => 'Save Position';
+
+  @override
+  String get presetNamePrompt => 'Enter preset point name:';
 }

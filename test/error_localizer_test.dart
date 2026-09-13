@@ -72,6 +72,18 @@ void main() {
         contains('maintenance'),
       );
 
+      // Test SDK 1.1.4 fallback localization for newly added error codes
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.tooManyRequests, viL10n),
+        contains('Quá nhiều yêu cầu'),
+      );
+      expect(
+        AppErrorLocalizer.localizeCode(
+            HubSightErrorCode.tooManyRequests, enL10n),
+        contains('Too many requests'),
+      );
+
       // Test App Key Required & Invalid
       expect(
         AppErrorLocalizer.localizeCode(

@@ -67,15 +67,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       setState(() {
         _cameras = _cameras.map((c) {
           if (c.id == event.cameraId) {
-            return Camera(
-              id: c.id,
-              name: c.name,
-              host: c.host,
+            return c.copyWith(
               isActive: event.isOnline,
               isStopped: !event.isOnline,
-              enableAI: c.enableAI,
-              thumbnailUrl: c.thumbnailUrl,
-              streamName: c.streamName,
             );
           }
           return c;
@@ -86,6 +80,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Listen to AI real-time alerts
     _aiAlertSub = sdk.relay.onAIAlert.listen((event) {
       if (!mounted) return;
+      if (event.eventType != 'fall' && event.eventType != 'danger') return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -136,27 +131,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: context.cardAdaptive,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: context.borderAdaptive, width: 1),
+        scrolledUnderElevation: 0,
+        shape: const Border(),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: HubSightGradients.accentHeaderAdaptive(context),
+            boxShadow: [
+              BoxShadow(
+                color: HubSightColors.primary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
         ),
         automaticallyImplyLeading: false,
         titleSpacing: 20,
         title: Text(
           l10n.tabDashboard,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.4,
-            color: context.textPrimaryAdaptive,
+            color: Colors.white,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isMultiViewMode ? Icons.grid_view : Icons.view_quilt_outlined,
-              color: _isMultiViewMode ? HubSightColors.primary : context.textSecondaryAdaptive,
+            icon: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: _isMultiViewMode
+                  ? BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(8),
+                    )
+                  : null,
+              child: Icon(
+                _isMultiViewMode ? Icons.grid_view : Icons.view_quilt_outlined,
+                color: Colors.white,
+              ),
             ),
             tooltip: l10n.multiViewTitle,
             onPressed: _cameras.isEmpty ? null : () {
@@ -165,7 +181,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: context.textSecondaryAdaptive),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
               HapticFeedback.lightImpact();
               _loadCamerasAndToken();
@@ -209,7 +225,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 100),
       child: HubSightMultiViewGrid(
         session: _multiViewSession!,
         cameraIds: activeCameraIds,
@@ -221,7 +237,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildSnapshotGrid(HubSightSDK sdk, AppLocalizations l10n) {
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(top: 8, bottom: 100),
       itemCount: _cameras.length,
       separatorBuilder: (_, __) => Divider(height: 24, thickness: 1, color: context.borderAdaptive),
       itemBuilder: (context, index) {
@@ -263,13 +279,41 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            cam.name,
-                            style: TextStyle(
-                              color: context.textPrimaryAdaptive,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                cam.name,
+                                style: TextStyle(
+                                  color: context.textPrimaryAdaptive,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (cam.onvifPtzSupported) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+                                  ),
+                                  child: const Text('PTZ', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6))),
+                                ),
+                              ],
+                              if (cam.onvifEnabled) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                  ),
+                                  child: const Text('ONVIF', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                ),
+                              ],
+                            ],
                           ),
                           Text(
                             cam.host,

@@ -1351,6 +1351,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Easy on the eyes and saves battery on OLED'**
   String get themeDarkDesc;
+
+  /// No description provided for @ptzControl.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ Control'**
+  String get ptzControl;
+
+  /// No description provided for @ptzPadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pan / Tilt / Zoom Control'**
+  String get ptzPadTitle;
+
+  /// No description provided for @onvifBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF'**
+  String get onvifBadge;
+
+  /// No description provided for @ptzBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ'**
+  String get ptzBadge;
+
+  /// No description provided for @onvifDiscovery.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF Discovery'**
+  String get onvifDiscovery;
+
+  /// No description provided for @onvifDiscoverySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Probe network cameras, firmware, profiles & PTZ'**
+  String get onvifDiscoverySubtitle;
+
+  /// No description provided for @probeCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Probe Camera'**
+  String get probeCamera;
+
+  /// No description provided for @probeHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host / IP Address'**
+  String get probeHost;
+
+  /// No description provided for @probePort.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF Port'**
+  String get probePort;
+
+  /// No description provided for @probeUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF Username'**
+  String get probeUsername;
+
+  /// No description provided for @probePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF Password'**
+  String get probePassword;
+
+  /// No description provided for @probeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF probe successful'**
+  String get probeSuccess;
+
+  /// No description provided for @probeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF probe failed'**
+  String get probeFailed;
+
+  /// No description provided for @presetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset Positions'**
+  String get presetsTitle;
+
+  /// No description provided for @addPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Position'**
+  String get addPreset;
+
+  /// No description provided for @presetNamePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter preset point name:'**
+  String get presetNamePrompt;
 }
 
 class _AppLocalizationsDelegate

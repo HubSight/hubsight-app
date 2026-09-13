@@ -52,16 +52,28 @@ class OverlayBox {
 
 class WebRTCViewer extends ConsumerStatefulWidget {
   final String cameraId;
+  final String? cameraName;
   final bool enableAi;
   final bool showBbox;
   final ValueChanged<bool>? onLiveStatusChange;
+  final bool isFullscreen;
+  final VoidCallback? onToggleFullscreen;
+  final int streamReloadIndex;
+  final bool hasPtz;
+  final VoidCallback? onOpenPtz;
 
   const WebRTCViewer({
     super.key,
     required this.cameraId,
+    this.cameraName,
     this.enableAi = true,
     this.showBbox = true,
     this.onLiveStatusChange,
+    this.isFullscreen = false,
+    this.onToggleFullscreen,
+    this.streamReloadIndex = 0,
+    this.hasPtz = false,
+    this.onOpenPtz,
   });
 
   @override
@@ -79,7 +91,10 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   bool _isInitializing = true;
   String? _errorMessage;
   bool _isMuted = true;
-  bool _showTrace = false;
+  int _retryCount = 0;
+  static const int _maxAutoRetries = 2;
+  Timer? _retryTimer;
+  bool _showFullscreenPtzPad = false;
 
   final ValueNotifier<List<OverlayBox>> _boxesNotifier = ValueNotifier<List<OverlayBox>>([]);
 
@@ -92,13 +107,60 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   @override
   void didUpdateWidget(covariant WebRTCViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.cameraId != widget.cameraId) {
+    if (oldWidget.cameraId != widget.cameraId ||
+        oldWidget.streamReloadIndex != widget.streamReloadIndex) {
       _disposeCurrentManager();
+      _retryCount = 0;
       _initStream();
     }
   }
 
-  void _initStream() {
+  String _formatErrorMessage(dynamic error) {
+    final str = error.toString();
+    if (str.contains('502') || str.contains('503') || str.contains('connection refused') || str.contains('Bad Gateway')) {
+      return 'Máy chủ hoặc kết nối camera đang tạm thời gián đoạn (502 Bad Gateway). Đang thử lại...';
+    } else if (str.contains('404') || str.contains('not found')) {
+      return 'Camera không tồn tại hoặc đã bị gỡ khỏi hệ thống.';
+    } else if (str.contains('401') || str.contains('403')) {
+      return 'Phiên đăng nhập đã hết hạn hoặc không có quyền xem camera này.';
+    } else if (str.contains('SocketException') || str.contains('TimeoutException')) {
+      return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
+    }
+    return 'Lỗi kết nối camera: $error';
+  }
+
+  void _handleStreamError(dynamic error) {
+    widget.onLiveStatusChange?.call(false);
+    if (_retryCount < _maxAutoRetries) {
+      _retryCount++;
+      setState(() {
+        _isInitializing = true;
+        _errorMessage = 'Đang tự động kết nối lại luồng video ($_retryCount/$_maxAutoRetries)...';
+      });
+      _retryTimer?.cancel();
+      _retryTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) {
+          _disposeCurrentManager();
+          _initStream(isRetry: true);
+        }
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+        _errorMessage = _formatErrorMessage(error);
+      });
+    }
+  }
+
+  void _initStream({bool isRetry = false}) {
+    if (!isRetry) {
+      _retryCount = 0;
+    }
+    _retryTimer?.cancel();
+
     final sdk = ref.read(hubsightSdkProvider);
     if (sdk == null) {
       setState(() {
@@ -110,7 +172,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
 
     setState(() {
       _isInitializing = true;
-      _errorMessage = null;
+      if (!isRetry) _errorMessage = null;
     });
     widget.onLiveStatusChange?.call(false);
 
@@ -121,15 +183,13 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
       if (status == StreamStatus.connected) {
         setState(() {
           _isInitializing = false;
+          _errorMessage = null;
           _renderer = _rtcManager!.renderer;
+          _retryCount = 0;
         });
         widget.onLiveStatusChange?.call(true);
       } else if (status == StreamStatus.failed) {
-        setState(() {
-          _isInitializing = false;
-          _errorMessage = 'Không thể kết nối luồng trực tiếp.';
-        });
-        widget.onLiveStatusChange?.call(false);
+        _handleStreamError('Không thể kết nối luồng trực tiếp.');
       }
     });
 
@@ -138,16 +198,14 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
         setState(() {
           _renderer = renderer;
           _isInitializing = false;
+          _errorMessage = null;
+          _retryCount = 0;
         });
         widget.onLiveStatusChange?.call(true);
       }
     }).catchError((e) {
       if (mounted) {
-        setState(() {
-          _isInitializing = false;
-          _errorMessage = 'Lỗi kết nối camera: $e';
-        });
-        widget.onLiveStatusChange?.call(false);
+        _handleStreamError(e);
       }
     });
 
@@ -158,12 +216,16 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
         final rawBoxes = event.rawPayload!['boxes'] as List;
         final now = DateTime.now();
 
-        // Throttle updates to ~30fps max (33ms) to prevent UI thread starvation
+        // Throttle updates to ~25fps (40ms) to ensure smooth 60fps UI rendering
         if (_lastBoxUpdateTime != null &&
-            now.difference(_lastBoxUpdateTime!).inMilliseconds < 33) {
+            now.difference(_lastBoxUpdateTime!).inMilliseconds < 40) {
           return;
         }
         _lastBoxUpdateTime = now;
+
+        if (rawBoxes.isEmpty && _boxesNotifier.value.isEmpty) {
+          return;
+        }
 
         _boxesNotifier.value = rawBoxes
             .map((b) => OverlayBox.fromJson(Map<String, dynamic>.from(b as Map)))
@@ -171,16 +233,20 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
 
         // Auto-clear stale bounding boxes after 1.5s if detection stops
         _boxExpiryTimer?.cancel();
-        _boxExpiryTimer = Timer(const Duration(milliseconds: 1500), () {
-          if (mounted) {
-            _boxesNotifier.value = [];
-          }
-        });
+        if (rawBoxes.isNotEmpty) {
+          _boxExpiryTimer = Timer(const Duration(milliseconds: 1500), () {
+            if (mounted) {
+              _boxesNotifier.value = [];
+            }
+          });
+        }
       }
     });
   }
 
   void _disposeCurrentManager() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
     _statusSub?.cancel();
     _socketSub?.cancel();
     _boxExpiryTimer?.cancel();
@@ -221,8 +287,8 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
             RepaintBoundary(
               child: RTCVideoView(
                 _renderer!,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                filterQuality: FilterQuality.low,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                filterQuality: FilterQuality.none,
               ),
             ),
 
@@ -341,6 +407,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     ElevatedButton.icon(
                       onPressed: () {
                         _disposeCurrentManager();
+                        _retryCount = 0;
                         _initStream();
                       },
                       style: ElevatedButton.styleFrom(
@@ -357,13 +424,13 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               ),
             ),
 
-          // 6. Bottom Controls (Mute / Trace / AI Badge)
-          if (!_isInitializing && _errorMessage == null)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Row(
-                children: [
+          // 6. Bottom Controls (AI Badge / Mute / Fullscreen)
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: Row(
+              children: [
+                if (!_isInitializing && _errorMessage == null) ...[
                   if (widget.enableAi)
                     Container(
                       margin: const EdgeInsets.only(right: 6),
@@ -390,35 +457,6 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     ),
 
                   InkWell(
-                    onTap: () => setState(() => _showTrace = !_showTrace),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _showTrace ? const Color(0xFFE85D10) : Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.query_stats, color: Colors.white, size: 13),
-                          SizedBox(width: 4),
-                          Text(
-                            'Trace',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  InkWell(
                     onTap: _toggleMute,
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
@@ -436,35 +474,156 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     ),
                   ),
                 ],
+
+                if (widget.hasPtz) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    key: const Key('webrtc-ptz-button'),
+                    onTap: () {
+                      if (widget.isFullscreen) {
+                        setState(() => _showFullscreenPtzPad = !_showFullscreenPtzPad);
+                      } else {
+                        widget.onOpenPtz?.call();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: _showFullscreenPtzPad
+                            ? const Color(0xFF3B82F6).withValues(alpha: 0.8)
+                            : Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _showFullscreenPtzPad ? const Color(0xFF60A5FA) : Colors.white24,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.control_camera_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (widget.onToggleFullscreen != null) ...[
+                  if (!_isInitializing && _errorMessage == null) const SizedBox(width: 6),
+                  InkWell(
+                    key: const Key('webrtc-fullscreen-button'),
+                    onTap: widget.onToggleFullscreen,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Icon(
+                        widget.isFullscreen
+                            ? Icons.fullscreen_exit_rounded
+                            : Icons.fullscreen_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Fullscreen Floating PTZ Controller Pad Overlay
+          if (widget.isFullscreen && widget.hasPtz && _showFullscreenPtzPad)
+            Positioned(
+              right: 16,
+              bottom: 48,
+              child: Material(
+                color: Colors.transparent,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    HubSightPtzPad(
+                      key: const Key('fullscreen-ptz-pad'),
+                      cameraId: widget.cameraId,
+                      cameraService: ref.read(hubsightSdkProvider)?.cameras,
+                      buttonSize: 38.0,
+                      iconSize: 20.0,
+                      spacing: 6.0,
+                      padding: const EdgeInsets.all(10.0),
+                      borderRadius: 18.0,
+                      backgroundColor: Colors.black.withValues(alpha: 0.8),
+                      buttonColor: Colors.white.withValues(alpha: 0.15),
+                      buttonBorderColor: Colors.white24,
+                      iconColor: Colors.white,
+                      stopButtonColor: Colors.red.withValues(alpha: 0.3),
+                      stopIconColor: Colors.redAccent,
+                    ),
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: InkWell(
+                        onTap: () => setState(() => _showFullscreenPtzPad = false),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            color: Colors.black87,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, color: Colors.white70, size: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
-          // 7. Trace HUD Panel
-          if (_showTrace && !_isInitializing && _errorMessage == null)
+          // Fullscreen Top Bar (Back button, Camera name, Live status)
+          if (widget.isFullscreen)
             Positioned(
-              top: 10,
-              left: 10,
+              top: 12,
+              left: 12,
               child: Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.black.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.white24),
                 ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      'WEBRTC STREAM TRACE',
-                      style: TextStyle(
-                        color: Color(0xFFF97316),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
+                    InkWell(
+                      key: const Key('fullscreen-back-button'),
+                      onTap: widget.onToggleFullscreen,
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2.0),
+                        child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text('Protocol: WebRTC (WHEP)', style: TextStyle(color: Colors.white70, fontSize: 10)),
-                    Text('Heartbeat: 30s Gateway ping', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.cameraName ?? 'LIVE',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -585,6 +744,7 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BoundingBoxPainter oldDelegate) {
+    if (oldDelegate.boxes.isEmpty && boxes.isEmpty) return false;
     return oldDelegate.boxes != boxes;
   }
 }

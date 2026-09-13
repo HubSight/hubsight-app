@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
+import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
 import '../common/main_tab_screen.dart';
 import '../../core/theme/app_theme.dart';
@@ -19,6 +20,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   bool _isLoading = true;
+  bool _isClearingAll = false;
   String _filter = 'all'; // 'all' | 'unread'
   StreamSubscription? _socketSub;
 
@@ -30,9 +32,11 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final sdk = ref.read(hubsightSdkProvider);
     if (sdk != null) {
       sdk.relay.connect();
-      _socketSub = sdk.relay.onAIAlert.listen((data) {
+      _socketSub = sdk.relay.onAIAlert.listen((event) {
         if (!mounted) return;
-        _fetchNotifications();
+        if (event.eventType == 'fall' || event.eventType == 'danger') {
+          _fetchNotifications();
+        }
       });
     }
   }
@@ -41,90 +45,45 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     setState(() => _isLoading = true);
     try {
       final sdk = ref.read(hubsightSdkProvider);
-      if (sdk != null) {
-        final response = await sdk.notifications.listNotifications();
+      if (sdk == null) {
         if (mounted) {
           setState(() {
-            _notifications = response.items;
-            _unreadCount = response.unreadCount;
+            _notifications = [];
+            _unreadCount = 0;
             _isLoading = false;
           });
+        }
+        return;
+      }
 
-          if (_notifications.isEmpty) {
-            _loadSampleNotifications();
-          }
-        }
-      } else {
-        if (mounted) {
-          _loadSampleNotifications();
-          setState(() => _isLoading = false);
-        }
+      final response = await sdk.notifications.listNotifications();
+      if (mounted) {
+        setState(() {
+          _notifications = response.items;
+          _unreadCount = response.unreadCount;
+          _isLoading = false;
+        });
       }
     } catch (e) {
+      debugPrint('Failed to fetch notifications: $e');
       if (mounted) {
-        _loadSampleNotifications();
         setState(() => _isLoading = false);
+        _showError(e);
       }
     }
   }
 
-  void _loadSampleNotifications() {
-    final now = DateTime.now();
-    setState(() {
-      _notifications = [
-        AppNotification(
-          id: 'n1',
-          cameraId: '',
-          type: 'push',
-          title: 'Thông báo hệ thống',
-          body: 'Hệ thống NVR đang hoạt động ổn định. Đã ghi lại 24 bản ghi.',
-          category: 'system',
-          isRead: true,
-          createdAt: now.subtract(const Duration(hours: 1)),
+  void _showError(Object error) {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppErrorLocalizer.localize(error, l10n)),
+          backgroundColor: HubSightColors.error,
         ),
-        AppNotification(
-          id: 'n2',
-          cameraId: 'cam_facetime',
-          type: 'family',
-          title: 'Nhận diện thành viên: Anh Quốc',
-          body: 'Đã nhận diện thành viên gia đình Anh Quốc tại camera Facetime HD Cam',
-          category: 'family',
-          isRead: true,
-          createdAt: now.subtract(const Duration(hours: 2, minutes: 15)),
-        ),
-        AppNotification(
-          id: 'n3',
-          cameraId: 'cam_facetime',
-          type: 'danger',
-          title: 'Cảnh báo rủi ro: FIRE',
-          body: 'Phát hiện FIRE tại camera Facetime HD Cam',
-          category: 'risk',
-          isRead: false,
-          createdAt: now.subtract(const Duration(hours: 3)),
-        ),
-        AppNotification(
-          id: 'n4',
-          cameraId: 'cam_facetime',
-          type: 'fall',
-          title: 'Cảnh báo: Phát hiện té ngã',
-          body: 'Phát hiện tư thế té ngã tại camera Facetime HD Cam',
-          category: 'fall',
-          isRead: false,
-          createdAt: now.subtract(const Duration(days: 1, hours: 2)),
-        ),
-        AppNotification(
-          id: 'n5',
-          cameraId: 'cam_facetime',
-          type: 'stranger',
-          title: 'Cảnh báo: Người lạ mặt',
-          body: 'Phát hiện người lạ mặt xuất hiện trước camera Facetime HD Cam',
-          category: 'stranger',
-          isRead: false,
-          createdAt: now.subtract(const Duration(days: 2)),
-        ),
-      ];
-      _unreadCount = _notifications.where((n) => !n.isRead).length;
-    });
+      );
   }
 
   Future<void> _handleMarkRead(AppNotification item) async {
@@ -147,18 +106,57 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     await ref.read(hubsightSdkProvider)?.notifications.markAllAsRead();
   }
 
-  Future<void> _handleDelete(String id) async {
+  Future<bool> _deleteNotificationFromServer(String id) async {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) {
+      _showError(StateError('HubSight SDK is not initialized'));
+      return false;
+    }
+
+    try {
+      await sdk.notifications.deleteNotification(id);
+      return true;
+    } catch (e) {
+      debugPrint('Failed to delete notification $id: $e');
+      _showError(e);
+      return false;
+    }
+  }
+
+  void _removeNotificationLocally(AppNotification item) {
+    if (!mounted || !_notifications.any((n) => n.id == item.id)) return;
     setState(() {
-      final removed = _notifications.firstWhere((n) => n.id == id, orElse: () => _notifications.first);
-      if (!removed.isRead) {
+      _notifications.removeWhere((n) => n.id == item.id);
+      if (!item.isRead) {
         _unreadCount = (_unreadCount - 1).clamp(0, 999);
       }
-      _notifications.removeWhere((n) => n.id == id);
     });
-    await ref.read(hubsightSdkProvider)?.notifications.deleteNotification(id);
+  }
+
+  Future<List<String>> _loadAllNotificationIds(HubSightSDK sdk) async {
+    const pageSize = 100;
+    final ids = <String>{};
+    var fetchedItemCount = 0;
+    var page = 1;
+
+    while (true) {
+      final response = await sdk.notifications.listNotifications(
+        page: page,
+        limit: pageSize,
+      );
+      fetchedItemCount += response.items.length;
+      ids.addAll(response.items.map((item) => item.id));
+
+      if (fetchedItemCount >= response.total || response.items.length < pageSize) {
+        return ids.toList();
+      }
+      page++;
+    }
   }
 
   Future<void> _handleClearAll(AppLocalizations l10n) async {
+    if (_isClearingAll) return;
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -187,17 +185,34 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       ),
     );
 
-    if (confirm == true) {
-      final listCopy = List<AppNotification>.from(_notifications);
-      setState(() {
-        _notifications.clear();
-        _unreadCount = 0;
-      });
-      final sdk = ref.read(hubsightSdkProvider);
-      if (sdk != null) {
-        for (var item in listCopy) {
-          await sdk.notifications.deleteNotification(item.id);
-        }
+    if (confirm != true || !mounted || _isClearingAll) return;
+
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) {
+      _showError(StateError('HubSight SDK is not initialized'));
+      return;
+    }
+
+    setState(() => _isClearingAll = true);
+    try {
+      final ids = await _loadAllNotificationIds(sdk);
+      if (ids.isNotEmpty) {
+        await sdk.notifications.deleteNotifications(ids);
+      }
+      if (mounted) {
+        setState(() {
+          _notifications.clear();
+          _unreadCount = 0;
+        });
+        ref.read(unreadNotificationCountProvider.notifier).state = 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to clear notifications: $e');
+      _showError(e);
+      await _fetchNotifications();
+    } finally {
+      if (mounted) {
+        setState(() => _isClearingAll = false);
       }
     }
   }
@@ -254,15 +269,27 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     return Scaffold(
       backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: context.cardAdaptive,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: context.borderAdaptive, width: 1),
+        scrolledUnderElevation: 0,
+        shape: const Border(),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: HubSightGradients.accentHeaderAdaptive(context),
+            boxShadow: [
+              BoxShadow(
+                color: HubSightColors.primary.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
         ),
         automaticallyImplyLeading: false,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: Icon(Icons.arrow_back, color: context.textPrimaryAdaptive),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               )
             : null,
@@ -272,11 +299,11 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           children: [
             Text(
               l10n.notificationTitle,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.4,
-                color: context.textPrimaryAdaptive,
+                color: Colors.white,
               ),
             ),
             if (unreadCount > 0) ...[
@@ -284,13 +311,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: HubSightColors.error,
+                  color: Colors.white,
                   borderRadius: HubSightRadius.roundedXl,
                 ),
                 child: Text(
                   '$unreadCount',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: HubSightColors.primary,
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
                   ),
@@ -302,7 +329,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         actions: [
           if (unreadCount > 0)
             IconButton(
-              icon: const Icon(Icons.done_all_rounded, color: HubSightColors.primary, size: 22),
+              icon: const Icon(Icons.done_all_rounded, color: Colors.white, size: 22),
               tooltip: 'Đã đọc hết',
               onPressed: () {
                 HapticFeedback.lightImpact();
@@ -311,15 +338,23 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             ),
           if (_notifications.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.delete_sweep_outlined, color: context.textSecondaryAdaptive, size: 22),
+              icon: _isClearingAll
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.delete_sweep_outlined, color: Colors.white, size: 22),
               tooltip: l10n.deleteAll,
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _handleClearAll(l10n);
-              },
+              onPressed: _isClearingAll
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      _handleClearAll(l10n);
+                    },
             ),
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryAdaptive, size: 22),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
             tooltip: l10n.loading,
             onPressed: () {
               HapticFeedback.lightImpact();
@@ -373,6 +408,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   : _filteredList.isEmpty
                       ? _buildEmptyState(l10n)
                       : ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 100),
                           itemCount: _filteredList.length,
                           separatorBuilder: (_, __) => Divider(
                             height: 1,
@@ -499,7 +535,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => _handleDelete(item.id),
+      confirmDismiss: (_) => _deleteNotificationFromServer(item.id),
+      onDismissed: (_) => _removeNotificationLocally(item),
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -610,7 +647,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               // Delete action icon
               IconButton(
                 icon: Icon(Icons.close_rounded, size: 16, color: context.textMutedAdaptive),
-                onPressed: () => _handleDelete(item.id),
+                onPressed: () async {
+                  final deleted = await _deleteNotificationFromServer(item.id);
+                  if (deleted) _removeNotificationLocally(item);
+                },
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),

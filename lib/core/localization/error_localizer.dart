@@ -50,7 +50,7 @@ class AppErrorLocalizer {
         return l10n.errAppKeyInvalid;
 
       default:
-        return l10n.errGeneric;
+        return code.description(l10n.localeName);
     }
   }
 }
