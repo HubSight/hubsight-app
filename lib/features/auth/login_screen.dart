@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/localization/error_localizer.dart';
@@ -8,7 +8,7 @@ import '../../core/services/biometric_service.dart';
 import '../../core/services/fcm_service.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/theme/app_theme.dart';
-import '../camera/playback_screen.dart';
+import '../common/main_tab_screen.dart';
 import '../config/server_config_screen.dart';
 import 'change_password_dialog.dart';
 
@@ -509,7 +509,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _navigateToHome() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const PlaybackScreen()),
+      MaterialPageRoute(builder: (_) => const MainTabScreen()),
     );
   }
 
@@ -529,22 +529,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final appLocale = ref.watch(appLocaleProvider);
 
     return Scaffold(
-      backgroundColor: HubSightColors.bgDark,
+      backgroundColor: const Color(0xFF09090B),
       body: Stack(
         children: [
-          // Background subtle warm glow (matching WebApp ambient background)
-          Positioned(
-            top: -120,
-            right: -100,
+          // Background subtle world map (1:1 WebApp login-bg.png)
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.08,
+              child: Image.asset(
+                'assets/images/login-bg.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+              ),
+            ),
+          ),
+          // Layered gradient atmosphere (1:1 WebApp Login.tsx)
+          Positioned.fill(
             child: Container(
-              width: 340,
-              height: 340,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                   colors: [
-                    HubSightColors.primary.withValues(alpha: 0.08),
+                    Color(0x59020617), // slate-950/35
+                    Color(0x260F172A), // slate-900/15
+                    Color(0x40431407), // orange-950/25
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0.16, -0.16),
+                  radius: 0.9,
+                  colors: [
                     Colors.transparent,
+                    Color(0x610F172A),
+                    Color(0x9E0F172A),
+                  ],
+                  stops: [0.28, 0.72, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Color(0x8C020617),
+                    Colors.transparent,
+                    Color(0x330F172A),
                   ],
                 ),
               ),
@@ -552,12 +592,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
 
           SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 // Top Action Bar: Server Connection Status + Language Switcher
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 10.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -572,15 +612,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             );
                           },
-                          borderRadius: HubSightRadius.roundedCard,
+                          borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: HubSightColors.cardDark,
-                              borderRadius: HubSightRadius.roundedCard,
+                              color: const Color(0xEB09090B),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: HubSightColors.borderDark, width: 1.0),
+                                  color: const Color(0xFF27272A), width: 1.0),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -601,7 +641,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     sdk?.config.urls.gatewayUrl ??
                                         'Chưa cấu hình máy chủ',
                                     style: const TextStyle(
-                                      color: HubSightColors.textSecondary,
+                                      color: Color(0xFFA1A1AA),
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -610,7 +650,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 const Icon(Icons.tune_rounded,
-                                    size: 13, color: HubSightColors.textMuted),
+                                    size: 13, color: Color(0xFF71717A)),
                               ],
                             ),
                           ),
@@ -618,31 +658,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                       const SizedBox(width: 8),
 
-                      // Language Switcher Pill
+                      // Language Switcher Pill (Matching WebApp Globe + Flag)
                       InkWell(
                         onTap: () {
                           ref.read(appLocaleProvider.notifier).toggleLocale();
                         },
-                        borderRadius: HubSightRadius.roundedCard,
+                        borderRadius: BorderRadius.circular(12),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: HubSightColors.cardDark,
-                            borderRadius: HubSightRadius.roundedCard,
+                            color: const Color(0xEB09090B),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: HubSightColors.borderDark, width: 1.0),
+                                color: const Color(0xFF27272A), width: 1.0),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.language_rounded,
-                                  size: 14, color: HubSightColors.textMuted),
+                                  size: 14, color: Color(0xFF71717A)),
                               const SizedBox(width: 6),
                               Text(
-                                appLocale.languageCode.toUpperCase(),
+                                appLocale.languageCode == 'vi'
+                                    ? 'Tiếng Việt'
+                                    : 'English',
                                 style: const TextStyle(
-                                  color: HubSightColors.textSecondary,
+                                  color: Color(0xFFF4F4F5),
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -655,567 +697,704 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
 
-                // Main Centered Card
+                const SizedBox(height: 4),
+
+                // Main Bottom-Anchored Sheet (1:1 WebApp Mobile rounded-t-[1.75rem])
                 Expanded(
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 8.0),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      return Align(
+                        alignment: isMobile
+                            ? Alignment.bottomCenter
+                            : Alignment.center,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24.0, vertical: 24.0),
+                          width: double.infinity,
+                          constraints: isMobile
+                              ? const BoxConstraints()
+                              : const BoxConstraints(maxWidth: 420),
                           decoration: BoxDecoration(
-                            color: HubSightColors.cardDark,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: HubSightColors.borderDark, width: 1.0),
+                            color: const Color(0xF709090B),
+                            borderRadius: isMobile
+                                ? const BorderRadius.vertical(
+                                    top: Radius.circular(28))
+                                : BorderRadius.circular(24),
+                            border: isMobile
+                                ? const Border(
+                                    top: BorderSide(
+                                        color: Color(0xFF27272A), width: 1.0),
+                                  )
+                                : Border.all(
+                                    color: const Color(0xFF27272A), width: 1.0),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.55),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 32,
+                                offset: const Offset(0, -10),
                               ),
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Mobile Sheet Handle
-                              Center(
-                                child: Container(
-                                  width: 36,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: HubSightColors.borderDark,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Centered Brand Logo Box
-                              Center(
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: HubSightColors.primary,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: HubSightColors.primary
-                                            .withValues(alpha: 0.3),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
+                          child: SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
+                            padding: EdgeInsets.fromLTRB(
+                              20.0,
+                              12.0,
+                              20.0,
+                              MediaQuery.of(context).padding.bottom + 20.0,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Mobile Sheet Handle (w-10 h-1 rounded-full bg-slate-700)
+                                if (isMobile)
+                                  Center(
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      width: 40,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3F3F46),
+                                        borderRadius: BorderRadius.circular(2),
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                  child: Icon(
-                                    _showTwoFactorModal
-                                        ? Icons.shield_outlined
-                                        : Icons.camera_alt_rounded,
-                                    color: Colors.white,
-                                    size: 26,
+
+                                // Centered Brand Logo Box (w-12 h-12 rounded-2xl bg-orange-600)
+                                Center(
+                                  child: Container(
+                                    width: 52,
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEA580C),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFFEA580C)
+                                              .withValues(alpha: 0.35),
+                                          blurRadius: 14,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      _showTwoFactorModal
+                                          ? Icons.shield_outlined
+                                          : Icons.camera_alt_rounded,
+                                      color: Colors.white,
+                                      size: 26,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
+                                const SizedBox(height: 12),
 
-                              // Title
-                              Text(
-                                _showTwoFactorModal
-                                    ? l10n.twoFactorTitle
-                                    : 'HubSight',
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: HubSightColors.textPrimary,
-                                  letterSpacing: -0.5,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 4),
-
-                              // Subtitle
-                              Text(
-                                _showTwoFactorModal
-                                    ? l10n.twoFactorSubtitle
-                                    : l10n.loginSubtitle,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: HubSightColors.textMuted,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Error Banner
-                              if ((!_showTwoFactorModal &&
-                                      _errorMessage != null) ||
-                                  (_showTwoFactorModal &&
-                                      _twoFactorError != null)) ...[
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  margin: const EdgeInsets.only(bottom: 20),
-                                  decoration: BoxDecoration(
-                                    color: HubSightColors.errorBg,
-                                    borderRadius: HubSightRadius.roundedCard,
-                                    border: Border.all(
-                                        color: HubSightColors.errorBorder,
-                                        width: 1.0),
+                                // Title
+                                Text(
+                                  _showTwoFactorModal
+                                      ? l10n.twoFactorTitle
+                                      : 'HubSight',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFF4F4F5),
+                                    letterSpacing: -0.5,
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Padding(
-                                            padding: EdgeInsets.only(top: 2.0),
-                                            child: Icon(
-                                              Icons.error_outline,
-                                              color: HubSightColors.error,
-                                              size: 16,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 4),
+
+                                // Subtitle
+                                Text(
+                                  _showTwoFactorModal
+                                      ? l10n.twoFactorSubtitle
+                                      : l10n.loginSubtitle,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: Color(0xFF71717A),
+                                    height: 1.3,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 22),
+
+                                // Error Banner
+                                if ((!_showTwoFactorModal &&
+                                        _errorMessage != null) ||
+                                    (_showTwoFactorModal &&
+                                        _twoFactorError != null)) ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    margin: const EdgeInsets.only(bottom: 20),
+                                    decoration: BoxDecoration(
+                                      color: HubSightColors.errorBg,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: HubSightColors.errorBorder,
+                                          width: 1.0),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Padding(
+                                              padding: EdgeInsets.only(top: 2.0),
+                                              child: Icon(
+                                                Icons.error_outline,
+                                                color: HubSightColors.error,
+                                                size: 16,
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              _showTwoFactorModal
-                                                  ? _twoFactorError!
-                                                  : _errorMessage!,
-                                              style: const TextStyle(
-                                                color: HubSightColors.errorText,
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.w500,
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _showTwoFactorModal
+                                                    ? _twoFactorError!
+                                                    : _errorMessage!,
+                                                style: const TextStyle(
+                                                  color: HubSightColors.errorText,
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (_isAppKeyError &&
+                                            !_showTwoFactorModal) ...[
+                                          const SizedBox(height: 10),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            height: 36,
+                                            child: ElevatedButton.icon(
+                                              onPressed: () {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const ServerConfigScreen(
+                                                            isInitialSetup:
+                                                                false),
+                                                  ),
+                                                );
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    HubSightColors.error,
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                elevation: 0,
+                                              ),
+                                              icon: const Icon(
+                                                  Icons.qr_code_scanner_rounded,
+                                                  size: 15),
+                                              label: const Text(
+                                                'Cấu hình máy chủ ngay',
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold),
                                               ),
                                             ),
                                           ),
                                         ],
-                                      ),
-                                      if (_isAppKeyError &&
-                                          !_showTwoFactorModal) ...[
-                                        const SizedBox(height: 10),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 36,
-                                          child: ElevatedButton.icon(
-                                            onPressed: () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      const ServerConfigScreen(
-                                                          isInitialSetup:
-                                                              false),
-                                                ),
-                                              );
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  HubSightColors.error,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    HubSightRadius.roundedXl,
-                                              ),
-                                              elevation: 0,
-                                            ),
-                                            icon: const Icon(
-                                                Icons.qr_code_scanner_rounded,
-                                                size: 15),
-                                            label: const Text(
-                                              'Cấu hình máy chủ ngay',
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ),
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
 
-                              // ── STEP 1: Credentials & Passkey ──
-                              if (!_showTwoFactorModal) ...[
-                                // Username Field
-                                Text(
-                                  l10n.usernameLabel.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: HubSightColors.textSecondary,
-                                    letterSpacing: 0.5,
+                                // ── STEP 1: Credentials & Passkey ──
+                                if (!_showTwoFactorModal) ...[
+                                  // Username Field
+                                  Text(
+                                    l10n.usernameLabel.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFCBD5E1),
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: _usernameController,
-                                  style: const TextStyle(
-                                      color: HubSightColors.textPrimary,
-                                      fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: l10n.usernameHint,
-                                    prefixIcon: const Icon(
-                                        Icons.person_outline_rounded,
-                                        size: 18),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Password Field
-                                Text(
-                                  l10n.passwordLabel.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: HubSightColors.textSecondary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                TextField(
-                                  controller: _passwordController,
-                                  obscureText: _obscurePassword,
-                                  style: const TextStyle(
-                                      color: HubSightColors.textPrimary,
-                                      fontSize: 14),
-                                  decoration: InputDecoration(
-                                    hintText: l10n.passwordHint,
-                                    prefixIcon: const Icon(
-                                        Icons.lock_outline_rounded,
-                                        size: 18),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined,
-                                        size: 18,
-                                        color: HubSightColors.textMuted,
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: _usernameController,
+                                    style: const TextStyle(
+                                        color: Color(0xFFF4F4F5),
+                                        fontSize: 14),
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: const Color(0xFF18181B),
+                                      hintText: l10n.usernameHint,
+                                      hintStyle: const TextStyle(
+                                          color: Color(0xFF71717A),
+                                          fontSize: 14),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 13),
+                                      prefixIcon: const Icon(
+                                          Icons.person_outline_rounded,
+                                          size: 18,
+                                          color: Color(0xFF71717A)),
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFF27272A)),
                                       ),
-                                      onPressed: () => setState(() =>
-                                          _obscurePassword = !_obscurePassword),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Primary Submit Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 46,
-                                  child: ElevatedButton(
-                                    onPressed:
-                                        (_isLoading || _isBiometricLoading)
-                                            ? null
-                                            : _handleLogin,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: HubSightColors.primary,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: HubSightRadius.roundedXl,
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFF27272A)),
                                       ),
-                                      elevation: 0,
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFFEA580C),
+                                            width: 1.5),
+                                      ),
                                     ),
-                                    child: _isLoading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.2,
-                                            ),
-                                          )
-                                        : Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                l10n.loginButton,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Icon(
-                                                Icons.arrow_forward_rounded,
-                                                size: 17,
-                                                color: Colors.white,
-                                              ),
-                                            ],
-                                          ),
                                   ),
-                                ),
-                                const SizedBox(height: 16),
+                                  const SizedBox(height: 16),
 
-                                // OR Divider
-                                Row(
-                                  children: [
-                                    const Expanded(
-                                      child: Divider(
-                                          color: HubSightColors.borderDark,
-                                          thickness: 1),
+                                  // Password Field
+                                  Text(
+                                    l10n.passwordLabel.toUpperCase(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFCBD5E1),
+                                      letterSpacing: 0.5,
                                     ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12),
-                                      child: Text(
-                                        l10n.loginOrDivider.toUpperCase(),
-                                        style: const TextStyle(
-                                          color: HubSightColors.textMuted,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.2,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: _passwordController,
+                                    obscureText: _obscurePassword,
+                                    style: const TextStyle(
+                                        color: Color(0xFFF4F4F5),
+                                        fontSize: 14),
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: const Color(0xFF18181B),
+                                      hintText: l10n.passwordHint,
+                                      hintStyle: const TextStyle(
+                                          color: Color(0xFF71717A),
+                                          fontSize: 14),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 13),
+                                      prefixIcon: const Icon(
+                                          Icons.lock_outline_rounded,
+                                          size: 18,
+                                          color: Color(0xFF71717A)),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _obscurePassword
+                                              ? Icons.visibility_off_outlined
+                                              : Icons.visibility_outlined,
+                                          size: 18,
+                                          color: const Color(0xFF71717A),
                                         ),
+                                        onPressed: () => setState(() =>
+                                            _obscurePassword =
+                                                !_obscurePassword),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFF27272A)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFF27272A)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                            color: Color(0xFFEA580C),
+                                            width: 1.5),
                                       ),
                                     ),
-                                    const Expanded(
-                                      child: Divider(
-                                          color: HubSightColors.borderDark,
-                                          thickness: 1),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
+                                  ),
+                                  const SizedBox(height: 24),
 
-                                // Biometric / Passkey Login Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 46,
-                                  child: OutlinedButton(
-                                    onPressed:
-                                        (_isLoading || _isBiometricLoading)
-                                            ? null
-                                            : _handleBiometricLogin,
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor:
-                                          HubSightColors.surfaceDark,
-                                      foregroundColor:
-                                          HubSightColors.textPrimary,
-                                      side: const BorderSide(
-                                          color: HubSightColors.borderDark,
-                                          width: 1.0),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: HubSightRadius.roundedXl,
+                                  // Primary Submit Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton(
+                                      onPressed:
+                                          (_isLoading || _isBiometricLoading)
+                                              ? null
+                                              : _handleLogin,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFEA580C),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
                                       ),
-                                    ),
-                                    child: _isBiometricLoading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: HubSightColors.primary,
-                                              strokeWidth: 2.2,
-                                            ),
-                                          )
-                                        : Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                _biometricLabel == 'Face ID'
-                                                    ? Icons.face_rounded
-                                                    : Icons.fingerprint_rounded,
-                                                color: HubSightColors.primary,
-                                                size: 20,
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2.2,
                                               ),
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Text(
-                                                  _getBiometricButtonText(l10n),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  maxLines: 1,
+                                            )
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  l10n.loginButton,
                                                   style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: HubSightColors
-                                                        .textPrimary,
+                                                    fontSize: 14.5,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
+                                                const SizedBox(width: 8),
+                                                const Icon(
+                                                  Icons.arrow_forward_rounded,
+                                                  size: 18,
+                                                  color: Colors.white,
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // OR Divider
+                                  Row(
+                                    children: [
+                                      const Expanded(
+                                        child: Divider(
+                                            color: Color(0xFF27272A),
+                                            thickness: 1),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text(
+                                          l10n.loginOrDivider.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF71717A),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                      const Expanded(
+                                        child: Divider(
+                                            color: Color(0xFF27272A),
+                                            thickness: 1),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Biometric / Passkey Login Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: OutlinedButton(
+                                      onPressed:
+                                          (_isLoading || _isBiometricLoading)
+                                              ? null
+                                              : _handleBiometricLogin,
+                                      style: OutlinedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF18181B),
+                                        foregroundColor:
+                                            const Color(0xFFE2E8F0),
+                                        side: const BorderSide(
+                                            color: Color(0xFF27272A),
+                                            width: 1.0),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: _isBiometricLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                color: Color(0xFFEA580C),
+                                                strokeWidth: 2.2,
                                               ),
-                                            ],
-                                          ),
+                                            )
+                                          : Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  _biometricLabel == 'Face ID'
+                                                      ? Icons.face_rounded
+                                                      : Icons
+                                                          .fingerprint_rounded,
+                                                  color:
+                                                      const Color(0xFFEA580C),
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    _getBiometricButtonText(
+                                                        l10n),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    maxLines: 1,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Color(0xFFE2E8F0),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
                                   ),
-                                ),
-                              ] else ...[
-                                // ── STEP 2: 2FA Inline Challenge ──
-                                Text(
-                                  (_useRecoveryCode
-                                          ? l10n.recoveryCodeLabel
-                                          : l10n.twoFactorCodeLabel)
-                                      .toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: HubSightColors.textSecondary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                if (!_useRecoveryCode)
-                                  TextField(
-                                    controller: _totpController,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 6,
+                                ] else ...[
+                                  // ── STEP 2: 2FA Inline Challenge ──
+                                  Text(
+                                    (_useRecoveryCode
+                                            ? l10n.recoveryCodeLabel
+                                            : l10n.twoFactorCodeLabel)
+                                        .toUpperCase(),
                                     style: const TextStyle(
-                                      color: HubSightColors.textPrimary,
-                                      fontSize: 20,
-                                      letterSpacing: 6,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'monospace',
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    decoration: InputDecoration(
-                                      counterText: '',
-                                      hintText: l10n.twoFactorCodeHint,
-                                      hintStyle: const TextStyle(
-                                        color: HubSightColors.textMuted,
-                                        letterSpacing: 6,
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  TextField(
-                                    controller: _recoveryCodeController,
-                                    style: const TextStyle(
-                                      color: HubSightColors.textPrimary,
-                                      fontSize: 14,
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Nhập mã khôi phục 8-16 ký tự',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFCBD5E1),
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
-                                const SizedBox(height: 8),
-
-                                // Toggle Recovery Code Link
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _useRecoveryCode = !_useRecoveryCode;
-                                        _twoFactorError = null;
-                                      });
-                                    },
-                                    child: Text(
-                                      _useRecoveryCode
-                                          ? 'Sử dụng mã xác thực 6 số'
-                                          : l10n.useRecoveryCode,
+                                  const SizedBox(height: 6),
+                                  if (!_useRecoveryCode)
+                                    TextField(
+                                      controller: _totpController,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 6,
                                       style: const TextStyle(
-                                        color: HubSightColors.primary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFF4F4F5),
+                                        fontSize: 20,
+                                        letterSpacing: 6,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: const Color(0xFF18181B),
+                                        counterText: '',
+                                        hintText: l10n.twoFactorCodeHint,
+                                        hintStyle: const TextStyle(
+                                          color: Color(0xFF71717A),
+                                          letterSpacing: 6,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFF27272A)),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFF27272A)),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFFEA580C),
+                                              width: 1.5),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    TextField(
+                                      controller: _recoveryCodeController,
+                                      style: const TextStyle(
+                                        color: Color(0xFFF4F4F5),
+                                        fontSize: 14,
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: const Color(0xFF18181B),
+                                        hintText: 'Nhập mã khôi phục 8-16 ký tự',
+                                        hintStyle: const TextStyle(
+                                            color: Color(0xFF71717A)),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFF27272A)),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFF27272A)),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: const BorderSide(
+                                              color: Color(0xFFEA580C),
+                                              width: 1.5),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
+                                  const SizedBox(height: 8),
 
-                                // Verify Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 46,
-                                  child: ElevatedButton(
-                                    onPressed: _isVerifying2FA
-                                        ? null
-                                        : _handleVerify2FA,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: HubSightColors.primary,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: HubSightRadius.roundedXl,
+                                  // Toggle Recovery Code Link
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _useRecoveryCode = !_useRecoveryCode;
+                                          _twoFactorError = null;
+                                        });
+                                      },
+                                      child: Text(
+                                        _useRecoveryCode
+                                            ? 'Sử dụng mã xác thực 6 số'
+                                            : l10n.useRecoveryCode,
+                                        style: const TextStyle(
+                                          color: Color(0xFFEA580C),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                      elevation: 0,
                                     ),
-                                    child: _isVerifying2FA
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2.2,
-                                            ),
-                                          )
-                                        : Text(
-                                            l10n.verifyButton,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
                                   ),
-                                ),
-                                const SizedBox(height: 10),
+                                  const SizedBox(height: 16),
 
-                                // Back to Credentials
-                                Center(
-                                  child: TextButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _showTwoFactorModal = false;
-                                        _totpController.clear();
-                                        _recoveryCodeController.clear();
-                                        _twoFactorError = null;
-                                      });
-                                    },
-                                    icon: const Icon(
-                                      Icons.arrow_back_rounded,
-                                      size: 14,
-                                      color: HubSightColors.textMuted,
+                                  // Verify Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton(
+                                      onPressed: _isVerifying2FA
+                                          ? null
+                                          : _handleVerify2FA,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFEA580C),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: _isVerifying2FA
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2.2,
+                                              ),
+                                            )
+                                          : Text(
+                                              l10n.verifyButton,
+                                              style: const TextStyle(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
                                     ),
-                                    label: const Text(
-                                      'Quay lại đăng nhập',
-                                      style: TextStyle(
-                                        color: HubSightColors.textMuted,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // Back to Credentials
+                                  Center(
+                                    child: TextButton.icon(
+                                      onPressed: () {
+                                        setState(() {
+                                          _showTwoFactorModal = false;
+                                          _totpController.clear();
+                                          _recoveryCodeController.clear();
+                                          _twoFactorError = null;
+                                        });
+                                      },
+                                      icon: const Icon(
+                                        Icons.arrow_back_rounded,
+                                        size: 14,
+                                        color: Color(0xFF71717A),
+                                      ),
+                                      label: const Text(
+                                        'Quay lại đăng nhập',
+                                        style: TextStyle(
+                                          color: Color(0xFF71717A),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ),
+                                ],
+
+                                // Footer inside Card
+                                const SizedBox(height: 24),
+                                const Divider(
+                                    color: Color(0xFF27272A),
+                                    thickness: 1),
+                                const SizedBox(height: 12),
+                                Text(
+                                  l10n.footerVersion,
+                                  style: const TextStyle(
+                                    color: Color(0xFF71717A),
+                                    fontSize: 11,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  l10n.footerCopyright,
+                                  style: const TextStyle(
+                                    color: Color(0xFF52525B),
+                                    fontSize: 11,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
-
-                              // Footer inside Card
-                              const SizedBox(height: 24),
-                              const Divider(
-                                  color: HubSightColors.borderDark,
-                                  thickness: 1),
-                              const SizedBox(height: 12),
-                              Text(
-                                l10n.footerVersion,
-                                style: const TextStyle(
-                                  color: HubSightColors.textMuted,
-                                  fontSize: 11,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                l10n.footerCopyright,
-                                style: const TextStyle(
-                                  color: HubSightColors.textMuted,
-                                  fontSize: 11,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],

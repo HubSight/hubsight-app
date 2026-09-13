@@ -83,7 +83,7 @@ class BiometricService {
 
   /// Prompt native biometric authentication dialog
   Future<bool> authenticate({
-    String localizedReason = 'Vui lòng xác thực để mở khóa HubSight CCTV',
+    String localizedReason = 'Vui lòng xác thực để mở khóa HubSight',
   }) async {
     try {
       final isSupported = await canCheckBiometrics();

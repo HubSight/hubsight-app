@@ -163,6 +163,18 @@ class AppLocalizationsVi extends AppLocalizations {
   String get menuPlayback => 'Xem lại';
 
   @override
+  String get tabPlayback => 'Xem lại';
+
+  @override
+  String get tabDashboard => 'Lưới Camera';
+
+  @override
+  String get tabNotifications => 'Thông báo';
+
+  @override
+  String get tabSettings => 'Cài đặt';
+
+  @override
   String get menuNvrMonitor => 'Giám sát NVR';
 
   @override
@@ -621,4 +633,81 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get biometricSettingsQuickLoginDesc =>
       'Sử dụng Face ID hoặc Vân tay để đăng nhập ngay mà không cần nhập mật khẩu.';
+
+  @override
+  String get passkeyTitle => 'Khóa bảo mật & Sinh trắc học';
+
+  @override
+  String get passkeySubtitle =>
+      'Đăng nhập nhanh không cần mật khẩu với Face ID, Touch ID, Windows Hello hoặc mã PIN thiết bị.';
+
+  @override
+  String get addPasskeyBtn => 'Thêm thiết bị';
+
+  @override
+  String get noPasskeys =>
+      'Chưa có thiết bị xác thực nào được liên kết với tài khoản này.';
+
+  @override
+  String get passkeyCreated => 'Đã liên kết';
+
+  @override
+  String get passkeyLastUsed => 'Dùng lần cuối';
+
+  @override
+  String get passkeyNeverUsed => 'Chưa sử dụng';
+
+  @override
+  String get renamePasskey => 'Đổi tên';
+
+  @override
+  String get deletePasskey => 'Xóa';
+
+  @override
+  String get passkeyNamePlaceholder =>
+      'Ví dụ: iPhone Face ID / MacBook Touch ID';
+
+  @override
+  String get passkeyNamePrompt => 'Đặt tên cho thiết bị xác thực:';
+
+  @override
+  String get confirmDeletePasskey =>
+      'Bạn có chắc muốn xóa thiết bị xác thực này không?';
+
+  @override
+  String get passkeyUpdated => 'Đã cập nhật tên thiết bị!';
+
+  @override
+  String get passkeyDeleted => 'Đã xóa thiết bị xác thực!';
+
+  @override
+  String get passkeyAdded => 'Đã thêm thiết bị xác thực thành công!';
+
+  @override
+  String get passkeyEnrollDialogTitle => 'Thêm thiết bị xác thực mới';
+
+  @override
+  String get themeTitle => 'Giao diện hiển thị';
+
+  @override
+  String get themeSubtitle =>
+      'Tùy chỉnh chế độ hiển thị sáng, tối hoặc tự động theo thiết bị';
+
+  @override
+  String get themeSystem => 'Theo thiết bị';
+
+  @override
+  String get themeLight => 'Sáng';
+
+  @override
+  String get themeDark => 'Tối';
+
+  @override
+  String get themeSystemDesc => 'Tự động đồng bộ theo hệ thống';
+
+  @override
+  String get themeLightDesc => 'Tối ưu cho môi trường nhiều ánh sáng';
+
+  @override
+  String get themeDarkDesc => 'Dịu mắt, tiết kiệm pin cho màn hình OLED';
 }

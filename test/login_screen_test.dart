@@ -1,12 +1,12 @@
-import 'package:cctv_app/core/storage/storage_service.dart';
-import 'package:cctv_app/features/auth/login_screen.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/core/storage/storage_service.dart';
+import 'package:hubsight_app/features/auth/login_screen.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:cctv_app/core/services/biometric_service.dart';
+import 'package:hubsight_app/core/services/biometric_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class MockBiometricService extends BiometricService {

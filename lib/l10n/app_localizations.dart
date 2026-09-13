@@ -380,6 +380,30 @@ abstract class AppLocalizations {
   /// **'Playback'**
   String get menuPlayback;
 
+  /// No description provided for @tabPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get tabPlayback;
+
+  /// No description provided for @tabDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Grid'**
+  String get tabDashboard;
+
+  /// No description provided for @tabNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get tabNotifications;
+
+  /// No description provided for @tabSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get tabSettings;
+
   /// No description provided for @menuNvrMonitor.
   ///
   /// In en, this message translates to:
@@ -1183,6 +1207,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use Face ID or Fingerprint to sign in instantly without typing password.'**
   String get biometricSettingsQuickLoginDesc;
+
+  /// No description provided for @passkeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric & Security Keys'**
+  String get passkeyTitle;
+
+  /// No description provided for @passkeySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast passwordless sign-in with Face ID, Touch ID, Windows Hello or Device PIN.'**
+  String get passkeySubtitle;
+
+  /// No description provided for @addPasskeyBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Device'**
+  String get addPasskeyBtn;
+
+  /// No description provided for @noPasskeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No authenticator devices registered on this account yet.'**
+  String get noPasskeys;
+
+  /// No description provided for @passkeyCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked'**
+  String get passkeyCreated;
+
+  /// No description provided for @passkeyLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used'**
+  String get passkeyLastUsed;
+
+  /// No description provided for @passkeyNeverUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get passkeyNeverUsed;
+
+  /// No description provided for @renamePasskey.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renamePasskey;
+
+  /// No description provided for @deletePasskey.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get deletePasskey;
+
+  /// No description provided for @passkeyNamePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. iPhone Face ID / MacBook Touch ID'**
+  String get passkeyNamePlaceholder;
+
+  /// No description provided for @passkeyNamePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a label for this device:'**
+  String get passkeyNamePrompt;
+
+  /// No description provided for @confirmDeletePasskey.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove this authenticator device?'**
+  String get confirmDeletePasskey;
+
+  /// No description provided for @passkeyUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Device updated successfully!'**
+  String get passkeyUpdated;
+
+  /// No description provided for @passkeyDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator device removed!'**
+  String get passkeyDeleted;
+
+  /// No description provided for @passkeyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator device registered successfully!'**
+  String get passkeyAdded;
+
+  /// No description provided for @passkeyEnrollDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Authenticator Device'**
+  String get passkeyEnrollDialogTitle;
+
+  /// No description provided for @themeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Appearance'**
+  String get themeTitle;
+
+  /// No description provided for @themeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize light, dark or automatic system appearance'**
+  String get themeSubtitle;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @themeSystemDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically matches device setting'**
+  String get themeSystemDesc;
+
+  /// No description provided for @themeLightDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Optimized for well-lit environments'**
+  String get themeLightDesc;
+
+  /// No description provided for @themeDarkDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy on the eyes and saves battery on OLED'**
+  String get themeDarkDesc;
 }
 
 class _AppLocalizationsDelegate

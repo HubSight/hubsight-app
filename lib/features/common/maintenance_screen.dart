@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/theme/app_theme.dart';

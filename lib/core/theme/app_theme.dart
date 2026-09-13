@@ -15,15 +15,23 @@ import 'package:flutter/material.dart';
 class HubSightColors {
   HubSightColors._();
 
-  // Backgrounds
+  // Backgrounds (Dark)
   static const Color bgDark = Color(0xFF000000); // slate-950
   static const Color cardDark = Color(0xFF09090B); // slate-900
   static const Color surfaceElevated = Color(0xFF111113); // slate-850
   static const Color surfaceDark = Color(0xFF18181B); // slate-800
 
+  // Backgrounds (Light - matching WebApp Tailwind palette)
+  static const Color bgLight = Color(0xFFF8FAFC); // slate-50
+  static const Color cardLight = Color(0xFFFFFFFF); // white
+  static const Color surfaceElevatedLight = Color(0xFFF1F5F9); // slate-100
+  static const Color surfaceLight = Color(0xFFF1F5F9); // slate-100
+
   // Borders
   static const Color borderDark = Color(0xFF27272A); // slate-700 (crisp zinc-800)
   static const Color borderSubtle = Color(0xFF18181B); // slate-800
+  static const Color borderLight = Color(0xFFE2E8F0); // slate-200
+  static const Color borderSubtleLight = Color(0xFFF1F5F9); // slate-100
 
   // Brand Accent (Orange)
   static const Color primary = Color(0xFFEA580C); // orange-600 (official)
@@ -31,10 +39,15 @@ class HubSightColors {
   static const Color primaryLight = Color(0xFFF97316); // orange-500
   static const Color primaryBg = Color(0x26EA580C); // orange-950/15%
 
-  // Typography & Neutrals
+  // Typography & Neutrals (Dark)
   static const Color textPrimary = Color(0xFFF4F4F5); // slate-100
   static const Color textSecondary = Color(0xFFA1A1AA); // slate-400
   static const Color textMuted = Color(0xFF71717A); // slate-500
+
+  // Typography & Neutrals (Light)
+  static const Color textPrimaryLight = Color(0xFF0F172A); // slate-900
+  static const Color textSecondaryLight = Color(0xFF475569); // slate-600
+  static const Color textMutedLight = Color(0xFF64748B); // slate-500
 
   // Status & Feedback
   static const Color error = Color(0xFFEF4444); // red-500
@@ -43,6 +56,26 @@ class HubSightColors {
   static const Color errorText = Color(0xFFFCA5A5); // red-300
   static const Color success = Color(0xFF22C55E); // green-500
   static const Color successBg = Color(0x2614532D); // green-950/15%
+
+  // Adaptive Helpers
+  static Color bg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? bgDark : bgLight;
+  static Color card(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? cardDark : cardLight;
+  static Color surface(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? surfaceDark : surfaceLight;
+  static Color surfaceElevatedColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? surfaceElevated : surfaceElevatedLight;
+  static Color border(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? borderDark : borderLight;
+  static Color borderSubtleColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? borderSubtle : borderSubtleLight;
+  static Color textPrimaryColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? textPrimary : textPrimaryLight;
+  static Color textSecondaryColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? textSecondary : textSecondaryLight;
+  static Color textMutedColor(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? textMuted : textMutedLight;
 }
 
 /// HubSight Exact Border Radiuses
@@ -220,4 +253,161 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get lightTheme {
+    return ThemeData(
+      brightness: Brightness.light,
+      useMaterial3: true,
+      scaffoldBackgroundColor: HubSightColors.bgLight,
+      canvasColor: HubSightColors.cardLight,
+      cardColor: HubSightColors.cardLight,
+      dividerColor: HubSightColors.borderLight,
+      colorScheme: const ColorScheme.light(
+        primary: HubSightColors.primary,
+        onPrimary: Colors.white,
+        secondary: HubSightColors.primaryLight,
+        onSecondary: Colors.white,
+        surface: HubSightColors.cardLight,
+        onSurface: HubSightColors.textPrimaryLight,
+        error: HubSightColors.error,
+        onError: Colors.white,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: HubSightColors.cardLight,
+        foregroundColor: HubSightColors.textPrimaryLight,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        shape: Border(
+          bottom: BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+      ),
+      drawerTheme: const DrawerThemeData(
+        backgroundColor: HubSightColors.cardLight,
+        elevation: 0,
+        shape: Border(
+          right: BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: HubSightColors.cardLight,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedCard,
+          side: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: HubSightColors.cardLight,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedCardLg,
+          side: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: HubSightColors.cardLight,
+        modalBackgroundColor: HubSightColors.cardLight,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedSheet,
+          side: BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: HubSightColors.cardLight,
+        contentTextStyle: const TextStyle(color: HubSightColors.textPrimaryLight, fontSize: 13),
+        shape: RoundedRectangleBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          side: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: HubSightColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: HubSightRadius.roundedXl,
+          ),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: HubSightColors.surfaceLight,
+          foregroundColor: HubSightColors.textPrimaryLight,
+          elevation: 0,
+          side: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: HubSightRadius.roundedXl,
+          ),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: HubSightColors.surfaceLight,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        hintStyle: const TextStyle(
+          color: HubSightColors.textMutedLight,
+          fontSize: 14,
+        ),
+        labelStyle: const TextStyle(
+          color: HubSightColors.textSecondaryLight,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        prefixIconColor: HubSightColors.textMutedLight,
+        suffixIconColor: HubSightColors.textMutedLight,
+        border: OutlineInputBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          borderSide: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          borderSide: const BorderSide(color: HubSightColors.borderLight, width: 1.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          borderSide: const BorderSide(color: HubSightColors.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          borderSide: const BorderSide(color: HubSightColors.error, width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: HubSightRadius.roundedXl,
+          borderSide: const BorderSide(color: HubSightColors.error, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+/// Extension on BuildContext for quick access to adaptive theme colors
+extension HubSightThemeExt on BuildContext {
+  bool get isDarkMode => Theme.of(this).brightness == Brightness.dark;
+
+  Color get bgAdaptive => isDarkMode ? HubSightColors.bgDark : HubSightColors.bgLight;
+  Color get cardAdaptive => isDarkMode ? HubSightColors.cardDark : HubSightColors.cardLight;
+  Color get surfaceAdaptive => isDarkMode ? HubSightColors.surfaceDark : HubSightColors.surfaceLight;
+  Color get surfaceElevatedAdaptive =>
+      isDarkMode ? HubSightColors.surfaceElevated : HubSightColors.surfaceElevatedLight;
+  Color get borderAdaptive => isDarkMode ? HubSightColors.borderDark : HubSightColors.borderLight;
+  Color get borderSubtleAdaptive =>
+      isDarkMode ? HubSightColors.borderSubtle : HubSightColors.borderSubtleLight;
+  Color get textPrimaryAdaptive =>
+      isDarkMode ? HubSightColors.textPrimary : HubSightColors.textPrimaryLight;
+  Color get textSecondaryAdaptive =>
+      isDarkMode ? HubSightColors.textSecondary : HubSightColors.textSecondaryLight;
+  Color get textMutedAdaptive =>
+      isDarkMode ? HubSightColors.textMuted : HubSightColors.textMutedLight;
 }

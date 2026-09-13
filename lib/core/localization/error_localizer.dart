@@ -1,4 +1,4 @@
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 
 /// Resolves machine-readable [HubSightErrorCode] or [Exception] into localized user-facing UI messages.

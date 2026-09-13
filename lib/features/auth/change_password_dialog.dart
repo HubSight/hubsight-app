@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/localization/error_localizer.dart';

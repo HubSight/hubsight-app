@@ -163,6 +163,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuPlayback => 'Playback';
 
   @override
+  String get tabPlayback => 'Playback';
+
+  @override
+  String get tabDashboard => 'Live Grid';
+
+  @override
+  String get tabNotifications => 'Notifications';
+
+  @override
+  String get tabSettings => 'Settings';
+
+  @override
   String get menuNvrMonitor => 'NVR Monitor';
 
   @override
@@ -618,4 +630,80 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get biometricSettingsQuickLoginDesc =>
       'Use Face ID or Fingerprint to sign in instantly without typing password.';
+
+  @override
+  String get passkeyTitle => 'Biometric & Security Keys';
+
+  @override
+  String get passkeySubtitle =>
+      'Fast passwordless sign-in with Face ID, Touch ID, Windows Hello or Device PIN.';
+
+  @override
+  String get addPasskeyBtn => 'Add Device';
+
+  @override
+  String get noPasskeys =>
+      'No authenticator devices registered on this account yet.';
+
+  @override
+  String get passkeyCreated => 'Linked';
+
+  @override
+  String get passkeyLastUsed => 'Last used';
+
+  @override
+  String get passkeyNeverUsed => 'Never';
+
+  @override
+  String get renamePasskey => 'Rename';
+
+  @override
+  String get deletePasskey => 'Remove';
+
+  @override
+  String get passkeyNamePlaceholder => 'e.g. iPhone Face ID / MacBook Touch ID';
+
+  @override
+  String get passkeyNamePrompt => 'Enter a label for this device:';
+
+  @override
+  String get confirmDeletePasskey =>
+      'Are you sure you want to remove this authenticator device?';
+
+  @override
+  String get passkeyUpdated => 'Device updated successfully!';
+
+  @override
+  String get passkeyDeleted => 'Authenticator device removed!';
+
+  @override
+  String get passkeyAdded => 'Authenticator device registered successfully!';
+
+  @override
+  String get passkeyEnrollDialogTitle => 'Add New Authenticator Device';
+
+  @override
+  String get themeTitle => 'Theme Appearance';
+
+  @override
+  String get themeSubtitle =>
+      'Customize light, dark or automatic system appearance';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get themeSystemDesc => 'Automatically matches device setting';
+
+  @override
+  String get themeLightDesc => 'Optimized for well-lit environments';
+
+  @override
+  String get themeDarkDesc => 'Easy on the eyes and saves battery on OLED';
 }

@@ -39,6 +39,7 @@ class AppLocaleNotifier extends StateNotifier<Locale> {
 class StorageService {
   final SharedPreferences _prefs;
   static const String _keyLocale = 'app_locale';
+  static const String _keyThemeMode = 'app_theme_mode';
 
   StorageService(this._prefs);
 
@@ -48,5 +49,13 @@ class StorageService {
 
   Future<bool> setLocale(String locale) async {
     return await _prefs.setString(_keyLocale, locale);
+  }
+
+  String? getThemeMode() {
+    return _prefs.getString(_keyThemeMode);
+  }
+
+  Future<bool> setThemeMode(String mode) async {
+    return await _prefs.setString(_keyThemeMode, mode);
   }
 }

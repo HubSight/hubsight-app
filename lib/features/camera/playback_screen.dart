@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:flutter/services.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
 import 'models/recognition_log.dart';
 import 'webrtc_viewer.dart';
-import '../notifications/notification_screen.dart';
-import '../common/app_sidebar.dart';
 import '../../core/theme/app_theme.dart';
 
 class PlaybackScreen extends ConsumerStatefulWidget {
@@ -26,6 +25,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   List<int> _availableDays = [];
   List<ArchiveSegment> _recordings = [];
   ArchiveSegment? _activeRecording;
+  final ScrollController _cameraScrollController = ScrollController();
 
   bool _isLoadingCameras = true;
   bool _isLoadingTimeline = false;
@@ -44,6 +44,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   StreamSubscription? _notificationSub;
   StreamSubscription? _cameraEventSub;
   Timer? _archiveTimer;
+  DateTime? _lastAlertSnackBarTime;
 
   @override
   void initState() {
@@ -60,17 +61,31 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
       _notificationSub = sdk.relay.onAIAlert.listen((event) {
         if (!mounted) return;
+        // Don't flood SnackBars on continuous AI detection / bbox packets
+        if (event.eventType != 'fall' && event.eventType != 'danger') return;
+
+        final now = DateTime.now();
+        if (_lastAlertSnackBarTime != null &&
+            now.difference(_lastAlertSnackBarTime!).inSeconds < 10) {
+          return;
+        }
+        _lastAlertSnackBarTime = now;
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
                 const Icon(Icons.warning_amber_rounded, color: Colors.white),
                 const SizedBox(width: 8),
-                Expanded(child: Text('Cảnh báo AI: ${event.eventType} tại camera ${event.cameraId}')),
+                Expanded(
+                  child: Text('Cảnh báo AI: ${event.title.isNotEmpty ? event.title : event.eventType} tại camera ${event.cameraId}'),
+                ),
               ],
             ),
-            backgroundColor: HubSightColors.primary,
+            backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
             shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
           ),
         );
@@ -200,14 +215,25 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       final sdk = ref.read(hubsightSdkProvider);
       if (sdk != null) {
         final res = await sdk.client.get('/cameras/${_selectedCam!.id}/recognition-logs');
-        if (mounted && res is List) {
+        List rawList = [];
+        if (res is List) {
+          rawList = res;
+        } else if (res is Map && res['data'] is List) {
+          rawList = res['data'] as List;
+        } else if (res is Map && res['logs'] is List) {
+          rawList = res['logs'] as List;
+        }
+        if (mounted) {
           setState(() {
-            _recognitionLogs = res.map((e) => RecognitionLog.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-            _isLoadingLogs = false;
+            _recognitionLogs = rawList
+                .map((e) => RecognitionLog.fromJson(Map<String, dynamic>.from(e as Map)))
+                .toList();
           });
         }
       }
     } catch (_) {
+      // Ignored
+    } finally {
       if (mounted) setState(() => _isLoadingLogs = false);
     }
   }
@@ -281,6 +307,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
   @override
   void dispose() {
+    _cameraScrollController.dispose();
     _notificationSub?.cancel();
     _cameraEventSub?.cancel();
     _archiveTimer?.cancel();
@@ -310,51 +337,36 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isCamStopped = _selectedCam?.isStopped ?? false;
     final dateFormatted = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    final dateIsoFormatted = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: HubSightColors.bgDark,
-      drawer: const AppSidebar(activeRoute: 'home'),
+      backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: HubSightColors.cardDark,
+        backgroundColor: context.cardAdaptive,
         elevation: 0,
-        shape: const Border(
-          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        shape: Border(
+          bottom: BorderSide(color: context.borderAdaptive, width: 1),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded, color: HubSightColors.textPrimary),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: HubSightColors.primary,
-                borderRadius: HubSightRadius.roundedXl,
-              ),
-              child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              l10n.appTitle,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: HubSightColors.textPrimary,
-              ),
-            ),
-          ],
+        automaticallyImplyLeading: false,
+        titleSpacing: 20,
+        title: Text(
+          'HubSight',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.4,
+            color: context.textPrimaryAdaptive,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: HubSightColors.textSecondary),
+            icon: Icon(Icons.refresh_rounded, color: context.textSecondaryAdaptive, size: 22),
+            tooltip: l10n.loading,
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotificationScreen()),
-              );
+              HapticFeedback.lightImpact();
+              _fetchCameras();
+              _fetchAvailableDays();
+              _fetchTimeline();
             },
           ),
           const SizedBox(width: 8),
@@ -372,26 +384,24 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Top Video Player Area
+              // 1. Top Video Player Area (16:9 Widescreen)
               _buildVideoPlayerSection(isCamStopped, l10n),
 
-              const SizedBox(height: 12),
+              // 2. Horizontal Quick Camera Selector Bar
+              _buildCameraQuickBar(l10n),
 
-              // 2. Camera Device & Date Picker Controls Card
-              _buildControlsCard(dateFormatted, l10n),
+              // 3. Unified Timeline & Playback Section
+              _buildUnifiedTimelineSection(dateFormatted, l10n),
 
-              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Divider(height: 20, thickness: 1, color: context.borderAdaptive),
+              ),
 
-              // 3. Event-based 24h Playback Timeline Dark Card
-              _buildEventPlaybackSection(dateIsoFormatted, l10n),
+              // 4. Live Activity & Recognition Section
+              _buildActivitySection(l10n),
 
-              const SizedBox(height: 14),
-
-              // 4. Face Recognition Logs Sidebar Section
-              if (_selectedCam != null && _selectedCam!.enableAI)
-                _buildRecognitionLogsSection(l10n),
-
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -399,56 +409,94 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     );
   }
 
-  // --- 1. Video Player Section ---
+  // --- 1. Video Player Section (16:9 Widescreen) ---
   Widget _buildVideoPlayerSection(bool isStopped, AppLocalizations l10n) {
-    return Container(
-      width: double.infinity,
-      height: 250,
-      color: Colors.black,
-      child: isStopped && _mode == 'live'
-          ? _buildStoppedCameraState(l10n)
-          : _mode == 'live'
-              ? Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    WebRTCViewer(
-                      cameraId: _selectedCam?.id ?? '',
-                      enableAi: _selectedCam?.enableAI ?? true,
-                      showBbox: true,
-                    ),
-                    // LIVE Badge Pin
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 8),
-                          ],
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        color: Colors.black,
+        child: ClipRect(
+          child: isStopped && _mode == 'live'
+              ? _buildStoppedCameraState(l10n)
+              : _mode == 'live'
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        WebRTCViewer(
+                          cameraId: _selectedCam?.id ?? '',
+                          enableAi: _selectedCam?.enableAI ?? true,
+                          showBbox: true,
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.circle, color: Colors.white, size: 8),
-                            SizedBox(width: 6),
-                            Text(
-                              'LIVE',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                        // Top Video Info Bar
+                        Positioned(
+                          top: 10,
+                          left: 12,
+                          right: 12,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFDC2626),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _selectedCam?.name ?? 'LIVE',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.hd_rounded, size: 14, color: Colors.white70),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '1080p',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                )
-              : _buildArchiveVideoPlayer(l10n),
+                      ],
+                    )
+                  : _buildArchiveVideoPlayer(l10n),
+        ),
+      ),
     );
   }
 
@@ -463,7 +511,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       children: [
         // Simulated video frame / poster
         Container(
-          color: HubSightColors.bgDark,
+          color: Colors.black,
           child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -474,7 +522,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   _activeRecording != null
                       ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_activeRecording!.startAt)
                       : l10n.playingArchive,
-                  style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 12.5),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12.5),
                 ),
               ],
             ),
@@ -502,16 +550,16 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: HubSightColors.surfaceDark,
+                    color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: HubSightRadius.roundedXl,
-                    border: Border.all(color: HubSightColors.borderDark),
+                    border: Border.all(color: Colors.white24),
                   ),
                   child: Text(
                     _activeRecording != null
                         ? DateFormat('HH:mm:ss').format(_activeRecording!.startAt)
                         : '00:00:00',
                     style: const TextStyle(
-                      color: HubSightColors.primaryLight,
+                      color: Colors.white,
                       fontSize: 11,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
@@ -619,6 +667,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     // Speed Selector
                     PopupMenuButton<double>(
                       initialValue: _playbackSpeed,
+                      color: context.cardAdaptive,
                       onSelected: (rate) {
                         setState(() => _playbackSpeed = rate);
                       },
@@ -627,20 +676,20 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           value: rate,
                           child: Text('${rate}x', style: TextStyle(
                             fontWeight: _playbackSpeed == rate ? FontWeight.bold : FontWeight.normal,
-                            color: _playbackSpeed == rate ? HubSightColors.primary : HubSightColors.textPrimary,
+                            color: _playbackSpeed == rate ? HubSightColors.primary : context.textPrimaryAdaptive,
                           )),
                         );
                       }).toList(),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: HubSightColors.surfaceDark,
+                          color: Colors.black.withValues(alpha: 0.65),
                           borderRadius: HubSightRadius.roundedXl,
-                          border: Border.all(color: HubSightColors.borderDark),
+                          border: Border.all(color: Colors.white24),
                         ),
                         child: Text(
                           '${_playbackSpeed}x',
-                          style: const TextStyle(color: HubSightColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -667,21 +716,21 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: HubSightColors.surfaceDark,
+                color: context.surfaceAdaptive,
                 borderRadius: HubSightRadius.roundedCard,
-                border: Border.all(color: HubSightColors.borderDark),
+                border: Border.all(color: context.borderAdaptive),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.videocam_off_outlined,
-                color: HubSightColors.textSecondary,
+                color: context.textSecondaryAdaptive,
                 size: 28,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               l10n.cameraStoppedStatus,
-              style: const TextStyle(
-                color: HubSightColors.textMuted,
+              style: TextStyle(
+                color: context.textMutedAdaptive,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -690,8 +739,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             const SizedBox(height: 4),
             Text(
               l10n.cameraStoppedTitle(camName),
-              style: const TextStyle(
-                color: HubSightColors.textPrimary,
+              style: TextStyle(
+                color: context.textPrimaryAdaptive,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -699,8 +748,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             const SizedBox(height: 6),
             Text(
               l10n.cameraStoppedDesc,
-              style: const TextStyle(
-                color: HubSightColors.textSecondary,
+              style: TextStyle(
+                color: context.textSecondaryAdaptive,
                 fontSize: 11.5,
                 height: 1.3,
               ),
@@ -712,148 +761,117 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     );
   }
 
-  // --- 2. Camera Device & Date Selection Card ---
-  Widget _buildControlsCard(String dateFormatted, AppLocalizations l10n) {
+  // --- 2. Camera Quick Selector Bar ---
+  Widget _buildCameraQuickBar(AppLocalizations l10n) {
+    if (_isLoadingCameras && _cameras.isEmpty) {
+      return const SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary),
+          ),
+        ),
+      );
+    }
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: HubSightColors.cardDark,
-        borderRadius: HubSightRadius.roundedCard,
-        border: Border.all(color: HubSightColors.borderDark),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Device Selector Pill
-              Expanded(
+      height: 40,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: ListView.separated(
+        controller: _cameraScrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        scrollDirection: Axis.horizontal,
+        itemCount: _cameras.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (index == _cameras.length) {
+            // More / List picker button
+            return InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                _showCameraPicker(l10n);
+              },
+              borderRadius: HubSightRadius.roundedFull,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: context.surfaceAdaptive,
+                  borderRadius: HubSightRadius.roundedFull,
+                  border: Border.all(color: context.borderAdaptive),
+                ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(Icons.tune_rounded, size: 14, color: context.textSecondaryAdaptive),
+                    const SizedBox(width: 4),
                     Text(
-                      l10n.deviceLabel,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: HubSightColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _showCameraPicker(l10n),
-                        borderRadius: HubSightRadius.roundedXl,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: HubSightColors.surfaceDark,
-                            borderRadius: HubSightRadius.roundedXl,
-                            border: Border.all(color: HubSightColors.borderDark),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _selectedCam?.name ?? l10n.selectCamera,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: HubSightColors.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down, size: 18, color: HubSightColors.textSecondary),
-                            ],
-                          ),
-                        ),
+                      'Tất cả',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.textSecondaryAdaptive,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
+            );
+          }
 
-              const SizedBox(width: 12),
+          final cam = _cameras[index];
+          final isSelected = cam.id == _selectedCam?.id;
+          final isStopped = cam.isStopped;
 
-              // Date Picker Pill
-              Expanded(
-                child: Row(
-                  children: [
-                    Text(
-                      l10n.dateLabel,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: HubSightColors.textSecondary,
-                      ),
+          return InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              _onSelectCamera(cam);
+            },
+            borderRadius: HubSightRadius.roundedFull,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? HubSightColors.primary.withValues(alpha: 0.16)
+                    : context.surfaceAdaptive,
+                borderRadius: HubSightRadius.roundedFull,
+                border: Border.all(
+                  color: isSelected ? HubSightColors.primary : context.borderAdaptive,
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isStopped
+                          ? const Color(0xFFEF4444)
+                          : (isSelected ? HubSightColors.primary : const Color(0xFF10B981)),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _showDatePicker(),
-                        borderRadius: HubSightRadius.roundedXl,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: HubSightColors.surfaceDark,
-                            borderRadius: HubSightRadius.roundedXl,
-                            border: Border.all(color: HubSightColors.borderDark),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                dateFormatted,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: HubSightColors.textPrimary,
-                                ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down, size: 18, color: HubSightColors.textSecondary),
-                            ],
-                          ),
-                        ),
-                      ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    cam.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected
+                          ? HubSightColors.primary
+                          : context.textPrimaryAdaptive,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: HubSightColors.borderDark),
-          const SizedBox(height: 10),
-
-          // Recordings Summary Count
-          Row(
-            children: [
-              Text(
-                l10n.recordsLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: HubSightColors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                _isLoadingTimeline
-                    ? l10n.loading
-                    : (_recordings.isEmpty
-                        ? l10n.noData
-                        : l10n.recordsCount(_recordings.length)),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: HubSightColors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -861,10 +879,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   void _showCameraPicker(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: HubSightColors.cardDark,
-      shape: const RoundedRectangleBorder(
+      backgroundColor: context.cardAdaptive,
+      shape: RoundedRectangleBorder(
         borderRadius: HubSightRadius.roundedSheet,
-        side: BorderSide(color: HubSightColors.borderDark),
+        side: BorderSide(color: context.borderAdaptive),
       ),
       builder: (context) {
         return SafeArea(
@@ -875,10 +893,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   l10n.selectCamera,
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
                 ),
               ),
-              const Divider(height: 1, color: HubSightColors.borderDark),
+              Divider(height: 1, color: context.borderAdaptive),
               Flexible(
                 child: _isLoadingCameras
                     ? const Padding(
@@ -902,7 +920,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   : Icons.videocam_outlined,
                               color: isSelected
                                   ? HubSightColors.primary
-                                  : HubSightColors.textMuted,
+                                  : context.textMutedAdaptive,
                             ),
                             title: Text(cam.name,
                                 style: TextStyle(
@@ -911,7 +929,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                         : FontWeight.normal,
                                     color: isSelected
                                         ? HubSightColors.primary
-                                        : HubSightColors.textPrimary)),
+                                        : context.textPrimaryAdaptive)),
                             trailing: isSelected
                                 ? const Icon(Icons.check,
                                     color: HubSightColors.primary)
@@ -942,14 +960,23 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         return _availableDays.contains(date.day);
       },
       builder: (context, child) {
+        final isDark = context.isDarkMode;
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: HubSightColors.primary,
-              surface: HubSightColors.cardDark,
-              onSurface: HubSightColors.textPrimary,
-            ),
-          ),
+          data: isDark
+              ? ThemeData.dark().copyWith(
+                  colorScheme: ColorScheme.dark(
+                    primary: HubSightColors.primary,
+                    surface: context.cardAdaptive,
+                    onSurface: context.textPrimaryAdaptive,
+                  ),
+                )
+              : ThemeData.light().copyWith(
+                  colorScheme: ColorScheme.light(
+                    primary: HubSightColors.primary,
+                    surface: context.cardAdaptive,
+                    onSurface: context.textPrimaryAdaptive,
+                  ),
+                ),
           child: child!,
         );
       },
@@ -960,322 +987,434 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     }
   }
 
-  // --- 3. Event-based 24h Playback Timeline Section ---
-  Widget _buildEventPlaybackSection(String dateIsoFormatted, AppLocalizations l10n) {
+  // --- 3. Unified Timeline & Playback Section ---
+  Widget _buildUnifiedTimelineSection(String dateFormatted, AppLocalizations l10n) {
     final count = _recordings.length;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: HubSightColors.cardDark,
-        borderRadius: HubSightRadius.roundedCard,
-        border: Border.all(color: HubSightColors.borderDark),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Bar with Sparkles
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: HubSightColors.surfaceDark,
-                  borderRadius: HubSightRadius.roundedXl,
-                  border: Border.all(color: HubSightColors.borderDark),
-                ),
-                child: const Icon(Icons.auto_awesome, color: HubSightColors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.eventTimelineTitle,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: HubSightColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      count == 0 ? l10n.noEventsToday : l10n.eventsToday(count),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: count == 0 ? const Color(0xFFFBBF24) : const Color(0xFF10B981),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Filters Row
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Row 1: Date Selector + Live Switch Button + Record count badge
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: HubSightColors.bgDark,
-                  borderRadius: HubSightRadius.roundedXl,
-                  border: Border.all(color: HubSightColors.borderDark),
-                ),
-                child: Row(
-                  children: [
-                    _buildFilterTab('all', l10n.filterAll(count)),
-                    _buildFilterTab('morning', l10n.filterMorning),
-                    _buildFilterTab('afternoon', l10n.filterAfternoon),
-                    _buildFilterTab('evening', l10n.filterEvening),
-                  ],
-                ),
-              ),
-
-              // Live Action Button
+              // Date Selector Button
               InkWell(
-                onTap: _handleGoLive,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showDatePicker();
+                },
                 borderRadius: HubSightRadius.roundedXl,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _mode == 'live' ? HubSightColors.primary : HubSightColors.surfaceDark,
+                    color: context.surfaceAdaptive,
                     borderRadius: HubSightRadius.roundedXl,
-                    border: Border.all(color: _mode == 'live' ? HubSightColors.primary : HubSightColors.borderDark),
+                    border: Border.all(color: context.borderAdaptive),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.radio_button_checked, size: 12, color: _mode == 'live' ? Colors.white : HubSightColors.textMuted),
-                      const SizedBox(width: 4),
+                      const Icon(Icons.calendar_today_outlined, size: 13, color: HubSightColors.primary),
+                      const SizedBox(width: 6),
                       Text(
-                        'Live',
+                        dateFormatted,
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: _mode == 'live' ? Colors.white : HubSightColors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: context.textPrimaryAdaptive,
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down, size: 15, color: context.textSecondaryAdaptive),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
 
-          const SizedBox(height: 14),
-
-          // 24h Timeline Bar
-          Column(
-            children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Live / Records indicator
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
-                  Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
-                  Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
-                  Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
-                  Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: HubSightColors.textMuted)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                height: 32,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: HubSightColors.bgDark,
-                  borderRadius: HubSightRadius.roundedXl,
-                  border: Border.all(color: HubSightColors.borderDark),
-                ),
-                child: Stack(
-                  children: [
-                    for (final rec in _filteredRecordings) ...[
-                      () {
-                        final start = rec.startAt;
-                        final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
-                        final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.95);
-                        final isSelected = _activeRecording?.id == rec.id;
-
-                        Color markerColor;
-                        switch (rec.eventType) {
-                          case 'danger':
-                            markerColor = const Color(0xFFF43F5E);
-                            break;
-                          case 'fall':
-                            markerColor = const Color(0xFFF59E0B);
-                            break;
-                          case 'stranger':
-                            markerColor = const Color(0xFFFB923C);
-                            break;
-                          default:
-                            markerColor = const Color(0xFF38BDF8);
-                        }
-
-                        return Positioned(
-                          left: leftRatio * 300,
-                          top: 3,
-                          bottom: 3,
-                          child: GestureDetector(
-                            onTap: () => _onSelectRecording(rec),
-                            child: Container(
-                              width: 6,
-                              decoration: BoxDecoration(
-                                color: isSelected ? Colors.white : markerColor,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
+                  // Live Button
+                  InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      _handleGoLive();
+                    },
+                    borderRadius: HubSightRadius.roundedXl,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _mode == 'live' ? HubSightColors.primary : context.surfaceAdaptive,
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(
+                          color: _mode == 'live' ? HubSightColors.primary : context.borderAdaptive,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.radio_button_checked,
+                            size: 11,
+                            color: _mode == 'live' ? Colors.white : context.textMutedAdaptive,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Live',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: _mode == 'live' ? Colors.white : context.textMutedAdaptive,
                             ),
                           ),
-                        );
-                      }(),
-                    ],
-                  ],
-                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // Count badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: context.surfaceAdaptive,
+                      borderRadius: HubSightRadius.roundedXl,
+                      border: Border.all(color: context.borderAdaptive),
+                    ),
+                    child: Text(
+                      _isLoadingTimeline
+                          ? l10n.loading
+                          : (_recordings.isEmpty
+                              ? l10n.noData
+                              : l10n.recordsCount(count)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: count > 0 ? const Color(0xFF10B981) : context.textMutedAdaptive,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+        ),
 
-          const SizedBox(height: 16),
+        // Row 2: Filter period tabs (All / Morning / Afternoon / Evening)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: context.surfaceAdaptive,
+              borderRadius: HubSightRadius.roundedXl,
+              border: Border.all(color: context.borderAdaptive),
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _buildFilterTab('all', l10n.filterAll(count))),
+                Expanded(child: _buildFilterTab('morning', l10n.filterMorning)),
+                Expanded(child: _buildFilterTab('afternoon', l10n.filterAfternoon)),
+                Expanded(child: _buildFilterTab('evening', l10n.filterEvening)),
+              ],
+            ),
+          ),
+        ),
 
-          // Recordings Clips Grid / List
-          if (_filteredRecordings.isNotEmpty) ...[
-            const Divider(color: HubSightColors.borderDark),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _filteredRecordings.length,
-              itemBuilder: (context, index) {
-                final rec = _filteredRecordings[index];
-                final isSelected = _activeRecording?.id == rec.id;
-                final duration = rec.durationSeconds > 0 ? rec.durationSeconds : 30;
+        const SizedBox(height: 10),
 
-                return InkWell(
-                  onTap: () => _onSelectRecording(rec),
-                  borderRadius: HubSightRadius.roundedXl,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? HubSightColors.surfaceElevated : HubSightColors.surfaceDark,
-                      borderRadius: HubSightRadius.roundedXl,
-                      border: Border.all(
-                        color: isSelected ? HubSightColors.primary : HubSightColors.borderDark,
+        // Row 3: 24h Timeline Ruler & Track (Edge-to-Edge Full Bleed)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('00:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: context.textMutedAdaptive)),
+              Text('06:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: context.textMutedAdaptive)),
+              Text('12:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: context.textMutedAdaptive)),
+              Text('18:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: context.textMutedAdaptive)),
+              Text('24:00', style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: context.textMutedAdaptive)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final barWidth = constraints.maxWidth;
+            return Container(
+              height: 36,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: context.surfaceAdaptive,
+                border: Border(
+                  top: BorderSide(color: context.borderAdaptive),
+                  bottom: BorderSide(color: context.borderAdaptive),
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Subtle hour graduation ticks
+                  for (int i = 1; i < 24; i++)
+                    Positioned(
+                      left: (i / 24.0) * barWidth,
+                      top: i % 6 == 0 ? 0 : 10,
+                      bottom: i % 6 == 0 ? 0 : 10,
+                      child: Container(
+                        width: 1,
+                        color: i % 6 == 0
+                            ? context.borderAdaptive
+                            : context.borderAdaptive.withValues(alpha: 0.4),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: HubSightColors.bgDark,
-                            borderRadius: HubSightRadius.roundedXl,
-                          ),
-                          child: Icon(
-                            isSelected ? Icons.play_arrow_rounded : Icons.videocam_outlined,
-                            color: HubSightColors.primary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.recordingEvent(rec.eventType.toUpperCase()),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: isSelected ? HubSightColors.primaryLight : HubSightColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${DateFormat('yyyy-MM-dd HH:mm:ss').format(rec.startAt)} (${duration}s)',
-                                style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(Icons.graphic_eq_rounded, color: HubSightColors.primary, size: 20),
-                      ],
+                  // Event markers
+                  for (final rec in _filteredRecordings)
+                    _buildTimelineMarker(rec, barWidth),
+                ],
+              ),
+            );
+          },
+        ),
+
+        // Row 4: Event clips / Loading / Empty
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: _isLoadingTimeline
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary),
                     ),
                   ),
-                );
-              },
-            ),
-          ],
-        ],
+                )
+              : _filteredRecordings.isEmpty
+                  ? Container(
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: context.surfaceAdaptive,
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(color: context.borderAdaptive),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_note_outlined, size: 16, color: context.textMutedAdaptive),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n.noEventsToday,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textMutedAdaptive,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 10),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _filteredRecordings.length.clamp(0, 8),
+                          itemBuilder: (context, index) {
+                            final rec = _filteredRecordings[index];
+                            final isSelected = _activeRecording?.id == rec.id;
+                            final duration = rec.durationSeconds > 0 ? rec.durationSeconds : 30;
+
+                            return InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                _onSelectRecording(rec);
+                              },
+                              borderRadius: HubSightRadius.roundedXl,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? context.surfaceElevatedAdaptive : context.surfaceAdaptive,
+                                  borderRadius: HubSightRadius.roundedXl,
+                                  border: Border.all(
+                                    color: isSelected ? HubSightColors.primary : context.borderAdaptive,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: context.cardAdaptive,
+                                        borderRadius: HubSightRadius.roundedXl,
+                                      ),
+                                      child: Icon(
+                                        isSelected ? Icons.play_arrow_rounded : Icons.videocam_outlined,
+                                        color: HubSightColors.primary,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            l10n.recordingEvent(rec.eventType.toUpperCase()),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isSelected ? HubSightColors.primary : context.textPrimaryAdaptive,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${DateFormat('yyyy-MM-dd HH:mm:ss').format(rec.startAt)} (${duration}s)',
+                                            style: TextStyle(fontSize: 10.5, color: context.textMutedAdaptive),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      const Icon(Icons.graphic_eq_rounded, color: HubSightColors.primary, size: 18),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineMarker(ArchiveSegment rec, double barWidth) {
+    final start = rec.startAt;
+    final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
+    final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 1.0);
+    final isSelected = _activeRecording?.id == rec.id;
+
+    Color markerColor;
+    switch (rec.eventType) {
+      case 'danger':
+        markerColor = const Color(0xFFF43F5E);
+        break;
+      case 'fall':
+        markerColor = const Color(0xFFF59E0B);
+        break;
+      case 'stranger':
+        markerColor = const Color(0xFFFB923C);
+        break;
+      default:
+        markerColor = const Color(0xFF10B981);
+    }
+
+    final leftPos = (leftRatio * (barWidth - 6)).clamp(0.0, barWidth - 6);
+
+    return Positioned(
+      left: leftPos,
+      top: 4,
+      bottom: 4,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          _onSelectRecording(rec);
+        },
+        child: Container(
+          width: 5,
+          decoration: BoxDecoration(
+            color: isSelected ? HubSightColors.primary : markerColor,
+            borderRadius: BorderRadius.circular(2.5),
+          ),
+        ),
       ),
     );
   }
 
-  // --- 4. Face Recognition Logs Sidebar Section ---
-  Widget _buildRecognitionLogsSection(AppLocalizations l10n) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: HubSightColors.cardDark,
-        borderRadius: HubSightRadius.roundedCard,
-        border: Border.all(color: HubSightColors.borderDark),
-      ),
+  // --- 4. Live Activity & Recognition Section ---
+  Widget _buildActivitySection(AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.face_retouching_natural_rounded, color: HubSightColors.primary, size: 20),
-                  SizedBox(width: 8),
+                  const Icon(Icons.face_retouching_natural_rounded, color: HubSightColors.primary, size: 18),
+                  const SizedBox(width: 8),
                   Text(
-                    'Nhật ký nhận diện khuôn mặt',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
+                    'Nhật ký nhận diện gần đây',
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
                   ),
                 ],
               ),
               Text(
                 '${_recognitionLogs.length} sự kiện',
-                style: const TextStyle(fontSize: 11.5, color: HubSightColors.textMuted),
+                style: TextStyle(fontSize: 11, color: context.textMutedAdaptive),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           if (_isLoadingLogs)
-            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary)))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary),
+                ),
+              ),
+            )
           else if (_recognitionLogs.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12.0),
-              child: Center(
-                child: Text('Chưa có dữ liệu nhận diện khuôn mặt', style: TextStyle(color: HubSightColors.textMuted, fontSize: 12)),
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 6.0),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: context.surfaceAdaptive,
+                borderRadius: HubSightRadius.roundedXl,
+                border: Border.all(color: context.borderAdaptive),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.face_outlined, size: 16, color: context.textMutedAdaptive),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Chưa có dữ liệu nhận diện khuôn mặt',
+                    style: TextStyle(color: context.textMutedAdaptive, fontSize: 12),
+                  ),
+                ],
               ),
             )
           else
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _recognitionLogs.length.clamp(0, 5),
+              itemCount: _recognitionLogs.length.clamp(0, 4),
               itemBuilder: (context, index) {
                 final log = _recognitionLogs[index];
                 return ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
-                    backgroundColor: HubSightColors.surfaceDark,
+                    radius: 16,
+                    backgroundColor: context.surfaceAdaptive,
                     backgroundImage: log.thumbnailUrl != null ? NetworkImage(log.thumbnailUrl!) : null,
-                    child: log.thumbnailUrl == null ? const Icon(Icons.person, color: HubSightColors.textSecondary, size: 18) : null,
+                    child: log.thumbnailUrl == null ? Icon(Icons.person, color: context.textSecondaryAdaptive, size: 16) : null,
                   ),
-                  title: Text(log.memberName ?? 'Người lạ', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary)),
-                  subtitle: Text(log.createdAt, style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted)),
+                  title: Text(log.memberName ?? 'Người lạ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive)),
+                  subtitle: Text(log.createdAt, style: TextStyle(fontSize: 10.5, color: context.textMutedAdaptive)),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -1285,7 +1424,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     ),
                     child: Text(
                       '${(log.confidence * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF34D399)),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
                     ),
                   ),
                 );
@@ -1299,21 +1438,31 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   Widget _buildFilterTab(String key, String label) {
     final isSelected = _filterPeriod == key;
     return InkWell(
-      onTap: () => setState(() => _filterPeriod = key),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _filterPeriod = key);
+      },
       borderRadius: HubSightRadius.roundedXl,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? HubSightColors.surfaceElevated : Colors.transparent,
+          color: isSelected
+              ? (context.isDarkMode ? context.surfaceElevatedAdaptive : Colors.white)
+              : Colors.transparent,
           borderRadius: HubSightRadius.roundedXl,
-          border: isSelected ? Border.all(color: HubSightColors.borderDark) : null,
+          border: isSelected ? Border.all(color: context.borderAdaptive) : null,
+          boxShadow: isSelected && !context.isDarkMode
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))]
+              : null,
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? HubSightColors.primaryLight : HubSightColors.textMuted,
+            color: isSelected ? HubSightColors.primary : context.textMutedAdaptive,
           ),
         ),
       ),

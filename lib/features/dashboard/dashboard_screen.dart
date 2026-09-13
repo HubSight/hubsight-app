@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:flutter/services.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
-import '../camera/playback_screen.dart';
-import '../common/app_sidebar.dart';
+import '../common/main_tab_screen.dart';
 import '../../core/theme/app_theme.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -134,31 +134,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final sdk = ref.watch(hubsightSdkProvider);
 
     return Scaffold(
-      backgroundColor: HubSightColors.bgDark,
-      drawer: const AppSidebar(activeRoute: 'home'),
+      backgroundColor: context.bgAdaptive,
       appBar: AppBar(
-        backgroundColor: HubSightColors.cardDark,
+        backgroundColor: context.cardAdaptive,
         elevation: 0,
-        shape: const Border(
-          bottom: BorderSide(color: HubSightColors.borderDark, width: 1),
+        shape: Border(
+          bottom: BorderSide(color: context.borderAdaptive, width: 1),
         ),
+        automaticallyImplyLeading: false,
+        titleSpacing: 20,
         title: Text(
-          l10n.dashboardTitle,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: HubSightColors.textPrimary),
+          l10n.tabDashboard,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.4,
+            color: context.textPrimaryAdaptive,
+          ),
         ),
         actions: [
           IconButton(
             icon: Icon(
               _isMultiViewMode ? Icons.grid_view : Icons.view_quilt_outlined,
-              color: _isMultiViewMode ? HubSightColors.primary : HubSightColors.textSecondary,
+              color: _isMultiViewMode ? HubSightColors.primary : context.textSecondaryAdaptive,
             ),
             tooltip: l10n.multiViewTitle,
-            onPressed: _cameras.isEmpty ? null : _toggleMultiViewMode,
+            onPressed: _cameras.isEmpty ? null : () {
+              HapticFeedback.lightImpact();
+              _toggleMultiViewMode();
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: HubSightColors.textSecondary),
-            onPressed: _loadCamerasAndToken,
+            icon: Icon(Icons.refresh, color: context.textSecondaryAdaptive),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _loadCamerasAndToken();
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
@@ -168,11 +181,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.videocam_off_outlined, size: 48, color: HubSightColors.textMuted),
+                      Icon(Icons.videocam_off_outlined, size: 48, color: context.textMutedAdaptive),
                       const SizedBox(height: 12),
                       Text(
                         l10n.dashboardNoCameras,
-                        style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 14),
+                        style: TextStyle(color: context.textSecondaryAdaptive, fontSize: 14),
                       ),
                     ],
                   ),
@@ -187,10 +200,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final activeCameraIds = _cameras.where((c) => c.isStreaming).map((c) => c.id).toList();
 
     if (activeCameraIds.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Không có camera nào đang hoạt động để phát trực tiếp',
-          style: TextStyle(color: HubSightColors.textMuted),
+          style: TextStyle(color: context.textMutedAdaptive),
         ),
       );
     }
@@ -207,106 +220,98 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildSnapshotGrid(HubSightSDK sdk, AppLocalizations l10n) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: _cameras.length,
+      separatorBuilder: (_, __) => Divider(height: 24, thickness: 1, color: context.borderAdaptive),
       itemBuilder: (context, index) {
         final cam = _cameras[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 14),
-          color: HubSightColors.cardDark,
-          shape: RoundedRectangleBorder(
-            borderRadius: HubSightRadius.roundedCard,
-            side: const BorderSide(color: HubSightColors.borderDark),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PlaybackScreen()),
-              );
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with Name and Status pill
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
+        return InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            ref.read(mainTabIndexProvider.notifier).state = 0;
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with Name and Status pill
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: cam.isStreaming
+                            ? const Color(0x2610B981)
+                            : HubSightColors.errorBg,
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(
                           color: cam.isStreaming
-                              ? const Color(0x2610B981)
-                              : HubSightColors.errorBg,
-                          borderRadius: HubSightRadius.roundedXl,
-                          border: Border.all(
-                            color: cam.isStreaming
-                                ? const Color(0x4D10B981)
-                                : HubSightColors.errorBorder,
+                              ? const Color(0x4D10B981)
+                              : HubSightColors.errorBorder,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.videocam,
+                        color: cam.isStreaming ? const Color(0xFF10B981) : HubSightColors.error,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cam.name,
+                            style: TextStyle(
+                              color: context.textPrimaryAdaptive,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          Icons.videocam,
-                          color: cam.isStreaming ? const Color(0xFF10B981) : HubSightColors.error,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              cam.name,
-                              style: const TextStyle(
-                                color: HubSightColors.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          Text(
+                            cam.host,
+                            style: TextStyle(
+                              color: context.textMutedAdaptive,
+                              fontSize: 11.5,
                             ),
-                            Text(
-                              cam.host,
-                              style: const TextStyle(
-                                color: HubSightColors.textMuted,
-                                fontSize: 11.5,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cam.isStreaming
+                            ? const Color(0x2610B981)
+                            : HubSightColors.errorBg,
+                        borderRadius: HubSightRadius.roundedXl,
+                        border: Border.all(
                           color: cam.isStreaming
-                              ? const Color(0x2610B981)
-                              : HubSightColors.errorBg,
-                          borderRadius: HubSightRadius.roundedXl,
-                          border: Border.all(
-                            color: cam.isStreaming
-                                ? const Color(0x4D10B981)
-                                : HubSightColors.errorBorder,
-                          ),
-                        ),
-                        child: Text(
-                          cam.isStreaming ? l10n.cameraOnline : l10n.cameraStopped,
-                          style: TextStyle(
-                            color: cam.isStreaming ? const Color(0xFF34D399) : HubSightColors.errorText,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                              ? const Color(0x4D10B981)
+                              : HubSightColors.errorBorder,
                         ),
                       ),
-                    ],
-                  ),
+                      child: Text(
+                        cam.isStreaming ? l10n.cameraOnline : l10n.cameraStopped,
+                        style: TextStyle(
+                          color: cam.isStreaming ? const Color(0xFF34D399) : HubSightColors.errorText,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ),
 
-                // 640p 15FPS Real-Time Snapshot Viewer
-                SizedBox(
-                  height: 200,
-                  width: double.infinity,
+              // 16:9 Real-Time Snapshot Viewer
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Container(
+                  color: Colors.black,
                   child: HubSightCameraThumbnail(
                     gatewayUrl: sdk.config.urls.gatewayUrl,
                     thumbnailUrl: cam.thumbnailUrl,
@@ -316,16 +321,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     refreshInterval: const Duration(seconds: 4),
                     fit: BoxFit.cover,
                     stoppedPlaceholder: Container(
-                      color: HubSightColors.bgDark,
+                      color: context.bgAdaptive,
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.videocam_off_outlined, color: HubSightColors.textMuted, size: 36),
+                            Icon(Icons.videocam_off_outlined, color: context.textMutedAdaptive, size: 36),
                             const SizedBox(height: 8),
                             Text(
                               l10n.cameraStoppedPlaceholder,
-                              style: const TextStyle(color: HubSightColors.textMuted, fontSize: 12),
+                              style: TextStyle(color: context.textMutedAdaptive, fontSize: 12),
                             ),
                           ],
                         ),
@@ -333,8 +338,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

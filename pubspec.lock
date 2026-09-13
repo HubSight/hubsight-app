@@ -512,11 +512,10 @@ packages:
   hubsight_sdk:
     dependency: "direct main"
     description:
-      name: hubsight_sdk
-      sha256: "6ec9a9a1d976e726f1a2f03dede6dccc5f6312edec64a5a85c56b0fb42c0cd59"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.2"
+      path: "../flutter-sdk"
+      relative: true
+    source: path
+    version: "1.1.4"
   intl:
     dependency: "direct main"
     description:

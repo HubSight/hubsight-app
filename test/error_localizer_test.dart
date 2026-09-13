@@ -1,5 +1,5 @@
-import 'package:cctv_app/core/localization/error_localizer.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/core/localization/error_localizer.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';

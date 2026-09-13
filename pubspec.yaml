@@ -1,4 +1,4 @@
-name: cctv_app
+name: hubsight_app
 description: HubSight - Smart Surveillance & Playback Mobile App
 publish_to: 'none'
 version: 1.0.0+1
@@ -14,7 +14,8 @@ dependencies:
   cupertino_icons: ^1.0.6
 
   # HubSight SDK
-  hubsight_sdk: any
+  hubsight_sdk:
+    path: ../flutter-sdk
 
   # State Management
   flutter_riverpod: ^2.5.1

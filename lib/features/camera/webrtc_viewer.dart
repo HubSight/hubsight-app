@@ -73,13 +73,15 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   RTCVideoRenderer? _renderer;
   StreamSubscription? _statusSub;
   StreamSubscription? _socketSub;
+  Timer? _boxExpiryTimer;
+  DateTime? _lastBoxUpdateTime;
 
   bool _isInitializing = true;
   String? _errorMessage;
   bool _isMuted = true;
   bool _showTrace = false;
 
-  List<OverlayBox> _boxes = [];
+  final ValueNotifier<List<OverlayBox>> _boxesNotifier = ValueNotifier<List<OverlayBox>>([]);
 
   @override
   void initState() {
@@ -149,15 +151,30 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
       }
     });
 
-    // Listen to AI bounding box events
+    // Listen to AI bounding box events (updates ValueNotifier without triggering full widget rebuilds)
     _socketSub = sdk.relay.onAIAlert.listen((event) {
       if (!mounted || event.cameraId != widget.cameraId) return;
       if (event.rawPayload != null && event.rawPayload!['boxes'] is List) {
         final rawBoxes = event.rawPayload!['boxes'] as List;
-        setState(() {
-          _boxes = rawBoxes
-              .map((b) => OverlayBox.fromJson(Map<String, dynamic>.from(b as Map)))
-              .toList();
+        final now = DateTime.now();
+
+        // Throttle updates to ~30fps max (33ms) to prevent UI thread starvation
+        if (_lastBoxUpdateTime != null &&
+            now.difference(_lastBoxUpdateTime!).inMilliseconds < 33) {
+          return;
+        }
+        _lastBoxUpdateTime = now;
+
+        _boxesNotifier.value = rawBoxes
+            .map((b) => OverlayBox.fromJson(Map<String, dynamic>.from(b as Map)))
+            .toList();
+
+        // Auto-clear stale bounding boxes after 1.5s if detection stops
+        _boxExpiryTimer?.cancel();
+        _boxExpiryTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            _boxesNotifier.value = [];
+          }
         });
       }
     });
@@ -166,14 +183,17 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   void _disposeCurrentManager() {
     _statusSub?.cancel();
     _socketSub?.cancel();
+    _boxExpiryTimer?.cancel();
     _rtcManager?.stopStream();
     _rtcManager = null;
     _renderer = null;
+    _boxesNotifier.value = [];
   }
 
   @override
   void dispose() {
     _disposeCurrentManager();
+    _boxesNotifier.dispose();
     super.dispose();
   }
 
@@ -191,62 +211,78 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final fallenCount = _boxes.where((b) => b.state == 'fall').length;
-
     return Container(
       color: Colors.black,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. RTC Video Renderer
+          // 1. RTC Video Renderer (Isolated in RepaintBoundary to eliminate frame composite jank)
           if (!_isInitializing && _errorMessage == null && _renderer != null)
-            RTCVideoView(
-              _renderer!,
-              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+            RepaintBoundary(
+              child: RTCVideoView(
+                _renderer!,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                filterQuality: FilterQuality.low,
+              ),
             ),
 
-          // 2. AI Bounding Box Overlays
-          if (widget.enableAi && widget.showBbox && _boxes.isNotEmpty)
+          // 2. AI Bounding Box Overlays (Isolated RepaintBoundary driven by ValueNotifier)
+          if (widget.enableAi && widget.showBbox)
             Positioned.fill(
-              child: CustomPaint(
-                painter: BoundingBoxPainter(boxes: _boxes),
+              child: RepaintBoundary(
+                child: ValueListenableBuilder<List<OverlayBox>>(
+                  valueListenable: _boxesNotifier,
+                  builder: (context, boxes, _) {
+                    if (boxes.isEmpty) return const SizedBox.shrink();
+                    return CustomPaint(
+                      painter: BoundingBoxPainter(boxes: boxes),
+                    );
+                  },
+                ),
               ),
             ),
 
-          // 3. Fall Detected Banner
-          if (fallenCount > 0)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      'CẢNH BÁO: TÉ NGÃ ($fallenCount)',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
+          // 3. Fall Detected Banner (Isolated builder - does not trigger full viewer rebuild)
+          ValueListenableBuilder<List<OverlayBox>>(
+            valueListenable: _boxesNotifier,
+            builder: (context, boxes, _) {
+              final fallenCount = boxes.where((b) => b.state == 'fall').length;
+              if (fallenCount == 0) return const SizedBox.shrink();
+              return Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'CẢNH BÁO: TÉ NGÃ ($fallenCount)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
 
           // 4. Loading Overlay
           if (_isInitializing)
@@ -296,8 +332,10 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     const SizedBox(height: 4),
                     Text(
                       _errorMessage!,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                       textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
@@ -458,6 +496,15 @@ class BoundingBoxPainter extends CustomPainter {
     [0, 1], [0, 2], [1, 3], [2, 4], [0, 5], [0, 6],
   ];
 
+  // Reusable static Paint instances to eliminate object allocation & GC churn in paint loop
+  static final Paint _boxPaint = Paint()..style = PaintingStyle.stroke;
+  static final Paint _pointPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _linePaint = Paint()..style = PaintingStyle.stroke..strokeWidth = 1.5;
+  static final Paint _badgePaint = Paint()..style = PaintingStyle.fill;
+
+  // Cached TextPainter instances by label to eliminate repeated font shaping and layout calculations
+  static final Map<String, TextPainter> _textPainterCache = {};
+
   @override
   void paint(Canvas canvas, Size size) {
     for (final box in boxes) {
@@ -470,18 +517,14 @@ class BoundingBoxPainter extends CustomPainter {
         box.y2 * size.height,
       );
 
-      final paint = Paint()
+      _boxPaint
         ..color = color
-        ..style = PaintingStyle.stroke
         ..strokeWidth = box.state == 'fall' ? 3.0 : 2.0;
-
-      canvas.drawRect(rect, paint);
+      canvas.drawRect(rect, _boxPaint);
 
       if (box.keypoints != null && box.keypoints!.length >= 17) {
         final kpts = box.keypoints!;
-        final linePaint = Paint()
-          ..color = color
-          ..strokeWidth = 1.5;
+        _linePaint.color = color;
 
         for (final pair in _poseSkeleton) {
           final a = pair[0];
@@ -493,37 +536,38 @@ class BoundingBoxPainter extends CustomPainter {
               canvas.drawLine(
                 Offset(pa[0] * size.width, pa[1] * size.height),
                 Offset(pb[0] * size.width, pb[1] * size.height),
-                linePaint,
+                _linePaint,
               );
             }
           }
         }
 
-        final pointPaint = Paint()
-          ..color = color
-          ..style = PaintingStyle.fill;
-
+        _pointPaint.color = color;
         for (final kp in kpts) {
           if (kp.length >= 3 && kp[2] > 0.3) {
-            canvas.drawCircle(Offset(kp[0] * size.width, kp[1] * size.height), 2.5, pointPaint);
+            canvas.drawCircle(Offset(kp[0] * size.width, kp[1] * size.height), 2.5, _pointPaint);
           }
         }
       }
 
       final label = box.name ?? box.state ?? '';
       if (label.isNotEmpty) {
-        final textSpan = TextSpan(
-          text: ' $label ',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-          ),
-        );
-        final textPainter = TextPainter(
-          text: textSpan,
-          textDirection: TextDirection.ltr,
-        )..layout();
+        var textPainter = _textPainterCache[label];
+        if (textPainter == null) {
+          final textSpan = TextSpan(
+            text: ' $label ',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+            ),
+          );
+          textPainter = TextPainter(
+            text: textSpan,
+            textDirection: TextDirection.ltr,
+          )..layout();
+          _textPainterCache[label] = textPainter;
+        }
 
         final badgeRect = Rect.fromLTWH(
           rect.left,
@@ -532,8 +576,8 @@ class BoundingBoxPainter extends CustomPainter {
           16,
         );
 
-        final badgePaint = Paint()..color = color;
-        canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(3)), badgePaint);
+        _badgePaint.color = color;
+        canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(3)), _badgePaint);
         textPainter.paint(canvas, Offset(badgeRect.left + 2, badgeRect.top + 1));
       }
     }

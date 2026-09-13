@@ -1,6 +1,6 @@
-import 'package:cctv_app/core/network/sdk_provider.dart';
-import 'package:cctv_app/features/common/maintenance_screen.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/core/network/sdk_provider.dart';
+import 'package:hubsight_app/features/common/maintenance_screen.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:cctv_app/l10n/app_localizations.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
 import 'core/network/sdk_provider.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/in_app_notification_service.dart';
 import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/auth/app_lock_screen.dart';
 import 'features/auth/login_screen.dart';
-import 'features/camera/playback_screen.dart';
+import 'features/common/main_tab_screen.dart';
 import 'features/common/maintenance_screen.dart';
-import 'features/config/server_config_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -71,6 +72,12 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
       final sdk = ref.read(hubsightSdkProvider);
       if (sdk != null) {
         final isAuth = await sdk.auth.isAuthenticated;
+        if (isAuth) {
+          try {
+            final profile = await sdk.auth.getProfile();
+            ref.read(appThemeModeProvider.notifier).syncFromProfile(profile.theme);
+          } catch (_) {}
+        }
         if (mounted) {
           setState(() {
             _isAuthenticated = isAuth;
@@ -78,6 +85,32 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
           });
           return;
         }
+      }
+    } else {
+      // Default initial server configuration for seamless out-of-the-box login
+      const defaultServerUrl = 'https://cctv.quoctran.space';
+      const defaultConfig = HubSightAppConfig(
+        urls: HubSightUrls(
+          gatewayUrl: defaultServerUrl,
+          apiBaseUrl: '$defaultServerUrl/api',
+          relayWsUrl: 'wss://cctv.quoctran.space/relay',
+          webrtcBaseUrl: '$defaultServerUrl:8555',
+        ),
+        key: HubSightClientKey(
+          clientId: 'hs_mob_default',
+          clientSecret: '',
+          clientName: 'HubSight Mobile',
+        ),
+        metadata: HubSightConfigMetadata(
+          formatVersion: '1.0',
+          configId: 'default_config',
+          name: 'HubSight Server',
+        ),
+      );
+      try {
+        await sdkNotifier.initializeFromConfig(defaultConfig);
+      } catch (e) {
+        debugPrint('Default SDK config initialization error: $e');
       }
     }
 
@@ -147,34 +180,34 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
   @override
   Widget build(BuildContext context) {
     final maintenanceEx = ref.watch(maintenanceStateProvider);
-    final sdk = ref.watch(hubsightSdkProvider);
     final appLocale = ref.watch(appLocaleProvider);
+    final themeMode = ref.watch(appThemeModeProvider);
 
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
-      title: 'HubSight CCTV',
-      theme: AppTheme.darkTheme,
+      title: 'HubSight',
+      theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: appLocale,
       home: maintenanceEx != null
           ? const MaintenanceScreen()
           : _isCheckingInitialAuth
-              ? const Scaffold(
-                  backgroundColor: HubSightColors.bgDark,
-                  body: Center(
+              ? Scaffold(
+                  backgroundColor: themeMode == ThemeMode.light
+                      ? HubSightColors.bgLight
+                      : HubSightColors.bgDark,
+                  body: const Center(
                     child: CircularProgressIndicator(
                       color: HubSightColors.primary,
                     ),
                   ),
                 )
-              : sdk == null
-                  ? const ServerConfigScreen(isInitialSetup: true)
-                  : _isAuthenticated
-                      ? const PlaybackScreen()
-                      : const LoginScreen(),
+              : _isAuthenticated
+                  ? const MainTabScreen()
+                  : const LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
