@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../network/api_client.dart';
+import '../network/sdk_provider.dart';
 
 /// Top-level background handler for FCM messages when app is in background or terminated
 @pragma('vm:entry-point')
@@ -15,12 +15,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 final fcmServiceProvider = Provider<FcmService>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return FcmService(apiClient: apiClient);
+  return FcmService(ref: ref);
 });
 
 class FcmService {
-  final ApiClient _apiClient;
+  final Ref _ref;
   bool _isInitialized = false;
   String? _fcmToken;
 
@@ -30,7 +29,7 @@ class FcmService {
   final _notificationClickController = StreamController<RemoteMessage>.broadcast();
   Stream<RemoteMessage> get onNotificationTapped => _notificationClickController.stream;
 
-  FcmService({required ApiClient apiClient}) : _apiClient = apiClient;
+  FcmService({required Ref ref}) : _ref = ref;
 
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _isInitialized;
@@ -108,14 +107,14 @@ class FcmService {
     }
   }
 
-  /// Sends device push token to backend
+  /// Sends device push token to backend via HubSight SDK
   Future<void> _registerTokenWithBackend(String token) async {
     try {
-      await _apiClient.subscribePush({
-        'token': token,
-        'user_agent': 'HubSight Mobile (Flutter)',
-      });
-      debugPrint('FCM token successfully registered with HubSight backend.');
+      final sdk = _ref.read(hubsightSdkProvider);
+      if (sdk != null) {
+        await sdk.fcm.registerPushToken(token);
+        debugPrint('FCM token successfully registered with HubSight SDK.');
+      }
     } catch (e) {
       debugPrint('Failed to register FCM token with backend: $e');
     }

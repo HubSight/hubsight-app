@@ -513,10 +513,10 @@ packages:
     dependency: "direct main"
     description:
       name: hubsight_sdk
-      sha256: "4bf625f0bbf2512a077029d0f3c6e6e60c6fdd3c59bb07f7a307eabc6ab52a91"
+      sha256: "6ec9a9a1d976e726f1a2f03dede6dccc5f6312edec64a5a85c56b0fb42c0cd59"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.1"
+    version: "1.1.2"
   intl:
     dependency: "direct main"
     description:

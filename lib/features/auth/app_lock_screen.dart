@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
-import '../../core/storage/storage_service.dart';
+import '../../core/network/sdk_provider.dart';
 import '../../core/theme/app_theme.dart';
 import 'login_screen.dart';
 
@@ -132,7 +132,10 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
   }
 
   void _handleLogout() async {
-    await ref.read(storageServiceProvider).clearAuthToken();
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk != null) {
+      await sdk.auth.logout();
+    }
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),

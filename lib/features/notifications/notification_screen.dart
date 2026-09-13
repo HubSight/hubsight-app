@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
-import 'models/notification_model.dart';
 import '../../core/theme/app_theme.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
@@ -14,7 +14,7 @@ class NotificationScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
-  List<NotificationItem> _notifications = [];
+  List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   bool _isLoading = true;
   String _filter = 'all'; // 'all' | 'unread'
@@ -43,20 +43,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         final response = await sdk.notifications.listNotifications();
         if (mounted) {
           setState(() {
-            _notifications = response.items
-                .map((n) => NotificationItem(
-                      id: n.id,
-                      cameraId: n.cameraId,
-                      type: n.type,
-                      title: n.title,
-                      body: n.body,
-                      category: n.category,
-                      memberId: n.memberId,
-                      thumbnailUrl: n.thumbnailUrl,
-                      isRead: n.isRead,
-                      createdAt: n.createdAt.toIso8601String(),
-                    ))
-                .toList();
+            _notifications = response.items;
             _unreadCount = response.unreadCount;
             _isLoading = false;
           });
@@ -83,16 +70,17 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     final now = DateTime.now();
     setState(() {
       _notifications = [
-        NotificationItem(
+        AppNotification(
           id: 'n1',
+          cameraId: '',
           type: 'push',
           title: 'Thông báo hệ thống',
           body: 'Hệ thống NVR đang hoạt động ổn định. Đã ghi lại 24 bản ghi.',
           category: 'system',
           isRead: true,
-          createdAt: now.subtract(const Duration(hours: 1)).toIso8601String(),
+          createdAt: now.subtract(const Duration(hours: 1)),
         ),
-        NotificationItem(
+        AppNotification(
           id: 'n2',
           cameraId: 'cam_facetime',
           type: 'family',
@@ -100,9 +88,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           body: 'Đã nhận diện thành viên gia đình Anh Quốc tại camera Facetime HD Cam',
           category: 'family',
           isRead: true,
-          createdAt: now.subtract(const Duration(hours: 2, minutes: 15)).toIso8601String(),
+          createdAt: now.subtract(const Duration(hours: 2, minutes: 15)),
         ),
-        NotificationItem(
+        AppNotification(
           id: 'n3',
           cameraId: 'cam_facetime',
           type: 'danger',
@@ -110,9 +98,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           body: 'Phát hiện FIRE tại camera Facetime HD Cam',
           category: 'risk',
           isRead: false,
-          createdAt: now.subtract(const Duration(hours: 3)).toIso8601String(),
+          createdAt: now.subtract(const Duration(hours: 3)),
         ),
-        NotificationItem(
+        AppNotification(
           id: 'n4',
           cameraId: 'cam_facetime',
           type: 'fall',
@@ -120,9 +108,9 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           body: 'Phát hiện tư thế té ngã tại camera Facetime HD Cam',
           category: 'fall',
           isRead: false,
-          createdAt: now.subtract(const Duration(days: 1, hours: 2)).toIso8601String(),
+          createdAt: now.subtract(const Duration(days: 1, hours: 2)),
         ),
-        NotificationItem(
+        AppNotification(
           id: 'n5',
           cameraId: 'cam_facetime',
           type: 'stranger',
@@ -130,14 +118,14 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           body: 'Phát hiện người lạ mặt xuất hiện trước camera Facetime HD Cam',
           category: 'stranger',
           isRead: false,
-          createdAt: now.subtract(const Duration(days: 2)).toIso8601String(),
+          createdAt: now.subtract(const Duration(days: 2)),
         ),
       ];
       _unreadCount = _notifications.where((n) => !n.isRead).length;
     });
   }
 
-  Future<void> _handleMarkRead(NotificationItem item) async {
+  Future<void> _handleMarkRead(AppNotification item) async {
     if (item.isRead) return;
     setState(() {
       _notifications = _notifications.map((n) {
@@ -198,7 +186,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     );
 
     if (confirm == true) {
-      final listCopy = List<NotificationItem>.from(_notifications);
+      final listCopy = List<AppNotification>.from(_notifications);
       setState(() {
         _notifications.clear();
         _unreadCount = 0;
@@ -212,18 +200,16 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     }
   }
 
-  void _handleItemClick(NotificationItem item) {
+  void _handleItemClick(AppNotification item) {
     if (!item.isRead) {
       _handleMarkRead(item);
     }
-    if (item.cameraId != null || item.body.toLowerCase().contains('camera')) {
+    if (item.cameraId.isNotEmpty || item.body.toLowerCase().contains('camera')) {
       Navigator.pop(context);
     }
   }
 
-  String _formatRelativeTime(String isoString, AppLocalizations l10n) {
-    final date = DateTime.tryParse(isoString);
-    if (date == null) return '';
+  String _formatRelativeTime(DateTime date, AppLocalizations l10n) {
     final diff = DateTime.now().difference(date);
 
     if (diff.inDays >= 30) {
@@ -240,7 +226,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     }
   }
 
-  List<NotificationItem> get _filteredList {
+  List<AppNotification> get _filteredList {
     if (_filter == 'unread') {
       return _notifications.where((n) => !n.isRead).toList();
     }
@@ -494,11 +480,11 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     );
   }
 
-  Widget _buildNotificationCard(NotificationItem item, AppLocalizations l10n) {
+  Widget _buildNotificationCard(AppNotification item, AppLocalizations l10n) {
     final isFamily = item.category == 'family' || item.type == 'family';
     final isGuest = item.category == 'guest' || item.type == 'guest';
     final isDanger = item.category == 'risk' || item.category == 'fall' || item.type == 'danger' || item.type == 'fall' || item.category == 'stranger';
-    final hasCameraPlayback = item.cameraId != null || item.body.toLowerCase().contains('camera');
+    final hasCameraPlayback = item.cameraId.isNotEmpty || item.body.toLowerCase().contains('camera');
     final relativeTime = _formatRelativeTime(item.createdAt, l10n);
 
     Color categoryColor;

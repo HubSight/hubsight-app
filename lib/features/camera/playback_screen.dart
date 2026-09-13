@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cctv_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../core/models/device_models.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
-import 'models/camera_models.dart';
+import 'models/recognition_log.dart';
 import 'webrtc_viewer.dart';
 import '../notifications/notification_screen.dart';
 import '../common/app_sidebar.dart';
@@ -20,12 +20,12 @@ class PlaybackScreen extends ConsumerStatefulWidget {
 
 class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  List<CameraItem> _cameras = [];
-  CameraItem? _selectedCam;
+  List<Camera> _cameras = [];
+  Camera? _selectedCam;
   DateTime _selectedDate = DateTime.now();
   List<int> _availableDays = [];
-  List<Recording> _recordings = [];
-  Recording? _activeRecording;
+  List<ArchiveSegment> _recordings = [];
+  ArchiveSegment? _activeRecording;
 
   bool _isLoadingCameras = true;
   bool _isLoadingTimeline = false;
@@ -84,30 +84,18 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         setState(() {
           _cameras = _cameras.map((c) {
             if (c.id == camId) {
-              return CameraItem(
-                id: c.id,
-                name: c.name,
-                host: c.host,
-                brand: c.brand,
+              return c.copyWith(
                 isActive: event.isOnline,
                 isStopped: isStopped,
-                enableAi: c.enableAi,
-                showBbox: c.showBbox,
               );
             }
             return c;
           }).toList();
 
           if (_selectedCam?.id == camId) {
-            _selectedCam = CameraItem(
-              id: _selectedCam!.id,
-              name: _selectedCam!.name,
-              host: _selectedCam!.host,
-              brand: _selectedCam!.brand,
+            _selectedCam = _selectedCam!.copyWith(
               isActive: event.isOnline,
               isStopped: isStopped,
-              enableAi: _selectedCam!.enableAi,
-              showBbox: _selectedCam!.showBbox,
             );
           }
         });
@@ -123,14 +111,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         final cameras = await sdk.cameras.listCameras();
         if (mounted) {
           setState(() {
-            _cameras = cameras.map((c) => CameraItem(
-              id: c.id,
-              name: c.name,
-              host: c.host,
-              isActive: c.isActive,
-              isStopped: c.isStopped,
-              enableAi: c.enableAI,
-            )).toList();
+            _cameras = cameras;
 
             if (_cameras.isNotEmpty && _selectedCam == null) {
               _selectedCam = _cameras.firstWhere((c) => !c.isStopped, orElse: () => _cameras.first);
@@ -191,17 +172,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
         if (mounted) {
           setState(() {
-            _recordings = segments.map((s) => Recording(
-              id: s.id,
-              cameraId: s.cameraId,
-              startAt: s.startAt.toIso8601String(),
-              endAt: s.endAt.toIso8601String(),
-              durationSeconds: s.durationSeconds,
-              filePath: 'recording_${s.id}.mp4',
-              thumbnailPath: s.thumbnailUrl,
-              sizeBytes: s.sizeBytes,
-              createdAt: s.startAt.toIso8601String(),
-            )).toList();
+            _recordings = segments;
 
             _isLoadingTimeline = false;
             if (_recordings.isNotEmpty) {
@@ -241,9 +212,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     }
   }
 
-
-
-  void _onSelectCamera(CameraItem cam) {
+  void _onSelectCamera(Camera cam) {
     setState(() {
       _selectedCam = cam;
       _mode = 'live';
@@ -263,7 +232,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     _fetchTimeline();
   }
 
-  void _onSelectRecording(Recording rec, [double startOffsetSeconds = 0.0]) {
+  void _onSelectRecording(ArchiveSegment rec, [double startOffsetSeconds = 0.0]) {
     setState(() {
       _mode = 'archive';
       _activeRecording = rec;
@@ -318,10 +287,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     super.dispose();
   }
 
-  List<Recording> get _filteredRecordings {
+  List<ArchiveSegment> get _filteredRecordings {
     if (_filterPeriod == 'all') return _recordings;
     return _recordings.where((rec) {
-      final hour = DateTime.tryParse(rec.startAt)?.hour ?? 0;
+      final hour = rec.startAt.hour;
       if (_filterPeriod == 'morning') return hour >= 0 && hour < 12;
       if (_filterPeriod == 'afternoon') return hour >= 12 && hour < 18;
       if (_filterPeriod == 'evening') return hour >= 18 && hour < 24;
@@ -419,7 +388,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               const SizedBox(height: 14),
 
               // 4. Face Recognition Logs Sidebar Section
-              if (_selectedCam != null && _selectedCam!.enableAi)
+              if (_selectedCam != null && _selectedCam!.enableAI)
                 _buildRecognitionLogsSection(l10n),
 
               const SizedBox(height: 30),
@@ -444,8 +413,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   children: [
                     WebRTCViewer(
                       cameraId: _selectedCam?.id ?? '',
-                      enableAi: _selectedCam?.enableAi ?? true,
-                      showBbox: _selectedCam?.showBbox ?? true,
+                      enableAi: _selectedCam?.enableAI ?? true,
+                      showBbox: true,
                     ),
                     // LIVE Badge Pin
                     Positioned(
@@ -503,7 +472,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _activeRecording != null
-                      ? _activeRecording!.startAt.replaceAll("T", " ")
+                      ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_activeRecording!.startAt)
                       : l10n.playingArchive,
                   style: const TextStyle(color: HubSightColors.textSecondary, fontSize: 12.5),
                 ),
@@ -538,7 +507,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     border: Border.all(color: HubSightColors.borderDark),
                   ),
                   child: Text(
-                    _activeRecording?.startAt.split('T').last.split('.').first ?? '00:00:00',
+                    _activeRecording != null
+                        ? DateFormat('HH:mm:ss').format(_activeRecording!.startAt)
+                        : '00:00:00',
                     style: const TextStyle(
                       color: HubSightColors.primaryLight,
                       fontSize: 11,
@@ -1126,7 +1097,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   children: [
                     for (final rec in _filteredRecordings) ...[
                       () {
-                        final start = DateTime.tryParse(rec.startAt) ?? DateTime.now();
+                        final start = rec.startAt;
                         final totalSeconds = start.hour * 3600 + start.minute * 60 + start.second;
                         final leftRatio = (totalSeconds / 86400.0).clamp(0.0, 0.95);
                         final isSelected = _activeRecording?.id == rec.id;
@@ -1226,7 +1197,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${rec.startAt.replaceAll("T", " ")} (${duration}s)',
+                                '${DateFormat('yyyy-MM-dd HH:mm:ss').format(rec.startAt)} (${duration}s)',
                                 style: const TextStyle(fontSize: 11, color: HubSightColors.textMuted),
                               ),
                             ],
@@ -1347,5 +1318,21 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         ),
       ),
     );
+  }
+}
+
+extension ArchiveSegmentEventExt on ArchiveSegment {
+  String get eventType {
+    final lower = (thumbnailUrl ?? '').toLowerCase();
+    if (lower.contains('fire') || lower.contains('smoke') || lower.contains('danger') || lower.contains('weapon')) {
+      return 'danger';
+    }
+    if (lower.contains('fall') || lower.contains('collapse') || lower.contains('anomaly')) {
+      return 'fall';
+    }
+    if (lower.contains('stranger')) {
+      return 'stranger';
+    }
+    return 'motion';
   }
 }
