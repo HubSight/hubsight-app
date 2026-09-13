@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,13 +87,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _checkQuickBiometricLogin() async {
     final bio = ref.read(biometricServiceProvider);
-    final sdk = ref.read(hubsightSdkProvider);
+    var sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) {
+      await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
+      sdk = ref.read(hubsightSdkProvider);
+    }
 
     if (bio.isBiometricEnabled && sdk != null) {
       final isAuthed = await sdk.auth.isAuthenticated;
       if (isAuthed) {
+        final label = _biometricLabel ?? 'Face ID';
         final success = await bio.authenticate(
-          localizedReason: 'Đăng nhập nhanh bằng sinh trắc học vào HubSight',
+          localizedReason: 'Đăng nhập nhanh bằng $label vào HubSight',
         );
         if (success && mounted) {
           _navigateToHome();
@@ -241,7 +248,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    // 2. Check if biometric credentials or active session exist
+    // 2. Check if biometric credentials, active session, or username for passkey exist
     final hasCreds = await bio.hasBiometricCredentials();
     var sdk = ref.read(hubsightSdkProvider);
     if (sdk == null) {
@@ -250,8 +257,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     final isAuthed = sdk != null ? await sdk.auth.isAuthenticated : false;
+    final lastUsername = bio.getLastUsername() ?? _usernameController.text.trim();
 
-    if (!hasCreds && !isAuthed) {
+    if (!hasCreds && !isAuthed && lastUsername.isEmpty) {
       if (mounted) {
         _showBiometricSetupNoticeDialog(l10n);
       }
@@ -268,9 +276,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    // 4. Perform login with saved biometric credentials
+    // 4. Perform login with Passkey (Passwordless) or saved credentials
     setState(() => _isBiometricLoading = true);
     try {
+      // 4A. Try Passwordless Passkey Login with server
+      if (sdk != null && lastUsername.isNotEmpty) {
+        try {
+          final options = await sdk.auth.getPasskeyLoginOptions(lastUsername);
+          final challengeId = options['challenge_id']?.toString() ??
+              options['challenge']?.toString() ??
+              '';
+          if (challengeId.isNotEmpty) {
+            final result = await sdk.auth.verifyPasskeyLogin(
+              challengeId: challengeId,
+              credential: jsonEncode({
+                'type': 'mobile_biometric',
+                'username': lastUsername,
+                'platform': defaultTargetPlatform.name,
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              }),
+            );
+            if (result.requires2FA) {
+              if (mounted) {
+                setState(() {
+                  _preAuthToken = result.preAuthToken;
+                  _showTwoFactorModal = true;
+                  _isBiometricLoading = false;
+                });
+              }
+              return;
+            }
+            if (result.isSuccess) {
+              await _onLoginSuccess(result, username: lastUsername);
+              return;
+            }
+          }
+        } catch (passkeyErr) {
+          debugPrint('Passkey passwordless login notice: $passkeyErr');
+        }
+      }
+
+      // 4B. Try saved biometric credentials (Keychain)
       if (hasCreds) {
         final creds = await bio.getBiometricCredentials();
         if (creds != null && sdk != null) {
@@ -295,7 +341,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
 
-      // If active session token exists, verify profile or refresh
+      // 4C. If active session token exists, verify profile or refresh
       if (sdk != null && await sdk.auth.isAuthenticated) {
         try {
           await sdk.auth.getProfile();

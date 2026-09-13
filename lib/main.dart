@@ -127,8 +127,9 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final bio = ref.read(biometricServiceProvider);
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (bio.isAuthenticating) return;
+
+    if (state == AppLifecycleState.paused) {
       bio.recordBackgroundTime();
     } else if (state == AppLifecycleState.resumed) {
       _checkAppLock();

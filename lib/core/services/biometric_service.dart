@@ -41,6 +41,8 @@ class BiometricService {
     }
   }
 
+  bool isAuthenticating = false;
+
   /// Check if hardware supports biometrics and device has enrolled biometrics
   Future<bool> canAuthenticateWithBiometrics() async {
     try {
@@ -48,7 +50,7 @@ class BiometricService {
       final isSupported = await _auth.isDeviceSupported();
       if (!canCheck && !isSupported) return false;
       final available = await _auth.getAvailableBiometrics();
-      return available.isNotEmpty;
+      return available.isNotEmpty || canCheck;
     } catch (e) {
       debugPrint('Error checking enrolled biometrics: $e');
       return false;
@@ -85,6 +87,8 @@ class BiometricService {
   Future<bool> authenticate({
     String localizedReason = 'Vui lòng xác thực để mở khóa HubSight',
   }) async {
+    if (isAuthenticating) return false;
+    isAuthenticating = true;
     try {
       final isSupported = await canCheckBiometrics();
       if (!isSupported) return false;
@@ -100,6 +104,10 @@ class BiometricService {
     } catch (e) {
       debugPrint('Biometric authentication error: $e');
       return false;
+    } finally {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        isAuthenticating = false;
+      });
     }
   }
 
@@ -150,7 +158,7 @@ class BiometricService {
     if (!isAppLockEnabled) return false;
 
     final lastBg = _prefs.getInt(_keyLastBackgroundTimestamp);
-    if (lastBg == null) return true;
+    if (lastBg == null) return false;
 
     final elapsedSeconds = (DateTime.now().millisecondsSinceEpoch - lastBg) ~/ 1000;
     final timeoutSeconds = lockTimeoutMinutes * 60;

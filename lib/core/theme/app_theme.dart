@@ -56,6 +56,7 @@ class HubSightColors {
   static const Color errorText = Color(0xFFFCA5A5); // red-300
   static const Color success = Color(0xFF22C55E); // green-500
   static const Color successBg = Color(0x2614532D); // green-950/15%
+  static const Color cherryRed = Color(0xFFD2143A); // cherry red
 
   // Adaptive Helpers
   static Color bg(BuildContext context) =>

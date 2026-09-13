@@ -68,6 +68,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần quyền truy cập máy ảnh để quét mã QR cấu hình HubSight.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>HubSight sử dụng Face ID để xác thực danh tính và mở khóa ứng dụng an toàn.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

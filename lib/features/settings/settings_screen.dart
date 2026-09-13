@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +11,7 @@ import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/services/fcm_service.dart';
+import '../auth/app_lock_screen.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
 import '../config/server_config_screen.dart';
@@ -202,17 +205,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final sdk = ref.read(hubsightSdkProvider);
       if (sdk != null) {
-        try {
-          await sdk.auth.verifyPasskeyRegister(
-            challengeId: 'bio_challenge_${DateTime.now().millisecondsSinceEpoch}',
-            credential: 'bio_credential_${DateTime.now().millisecondsSinceEpoch}',
-            name: name,
-          );
-        } catch (_) {
-          // Handled gracefully if backend requires WebAuthn binary signature
-        }
+        final options = await sdk.auth.getPasskeyRegisterOptions();
+        final challengeId = options['challenge_id']?.toString() ??
+            options['challenge']?.toString() ??
+            'bio_challenge_${DateTime.now().millisecondsSinceEpoch}';
+
+        final credentialPayload = jsonEncode({
+          'type': 'mobile_biometric',
+          'platform': defaultTargetPlatform.name,
+          'device_label': name,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+
+        await sdk.auth.verifyPasskeyRegister(
+          challengeId: challengeId,
+          credential: credentialPayload,
+          name: name,
+        );
+
         await bio.setBiometricEnabled(true);
+        if (_profile?.username != null && _profile!.username.isNotEmpty) {
+          await bio.saveLastUsername(_profile!.username);
+        }
+
         if (mounted) {
+          setState(() {
+            _biometricUnlock = true;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(l10n.passkeyAdded),
@@ -1267,7 +1286,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         else
           for (final keyItem in _passkeys) ...[
             _buildSettingTile(
-              icon: _buildSettingIcon(Icons.fingerprint_rounded, const Color(0xFF10B981)),
+              icon: _buildSettingIcon(
+                keyItem.name.toLowerCase().contains('face id')
+                    ? Icons.face_rounded
+                    : Icons.fingerprint_rounded,
+                const Color(0xFF10B981),
+              ),
               title: keyItem.name,
               subtitle: '${l10n.passkeyCreated}: ${keyItem.createdAt != null ? DateFormat("dd/MM/yyyy").format(keyItem.createdAt!) : l10n.passkeyNeverUsed}',
               trailing: Row(
@@ -1307,12 +1331,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           trailing: CupertinoSwitch(
             value: _lockOnBackground,
             activeTrackColor: HubSightColors.primary,
-            onChanged: (v) {
-              setState(() => _lockOnBackground = v);
-              ref.read(biometricServiceProvider).setAppLockEnabled(v);
+            onChanged: (v) async {
+              final bio = ref.read(biometricServiceProvider);
+              if (v) {
+                if (!bio.hasPin) {
+                  final pinCreated = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => AppLockScreen(
+                        isCreatingPin: true,
+                        onUnlocked: () => Navigator.pop(context, true),
+                      ),
+                    ),
+                  );
+                  if (pinCreated != true) {
+                    return;
+                  }
+                }
+                setState(() => _lockOnBackground = true);
+                await bio.setAppLockEnabled(true);
+                final canBio = await bio.canAuthenticateWithBiometrics();
+                if (canBio) {
+                  await bio.setBiometricEnabled(true);
+                  if (mounted) setState(() => _biometricUnlock = true);
+                }
+              } else {
+                setState(() => _lockOnBackground = false);
+                await bio.setAppLockEnabled(false);
+              }
             },
           ),
         ),
+        if (_lockOnBackground)
+          _buildSettingTile(
+            icon: _buildSettingIcon(Icons.pin_rounded, const Color(0xFF3B82F6)),
+            title: 'Đổi mã PIN bảo mật',
+            subtitle: 'Thiết lập lại mã PIN 4 chữ số dự phòng',
+            trailing: Icon(Icons.chevron_right_rounded, color: context.textMutedAdaptive, size: 20),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AppLockScreen(
+                    isCreatingPin: true,
+                    onUnlocked: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã cập nhật mã PIN mới thành công'),
+                          backgroundColor: Color(0xFF10B981),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
         _buildSettingTile(
           icon: _buildSettingIcon(Icons.face_retouching_natural_rounded, const Color(0xFF8B5CF6)),
           title: l10n.biometricUnlock,
@@ -1536,31 +1609,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Column(
       children: [
         const SizedBox(height: 6),
-        InkWell(
-          onTap: () => _confirmLogout(l10n),
-          borderRadius: HubSightRadius.roundedCard,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            decoration: BoxDecoration(
-              color: HubSightColors.errorBg,
-              borderRadius: HubSightRadius.roundedCard,
-              border: Border.all(color: HubSightColors.errorBorder),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.logout_rounded, color: HubSightColors.error, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.logout,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: HubSightColors.errorText,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _confirmLogout(l10n),
+            borderRadius: HubSightRadius.roundedCard,
+            child: Ink(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                color: HubSightColors.cherryRed,
+                borderRadius: HubSightRadius.roundedCard,
+                boxShadow: [
+                  BoxShadow(
+                    color: HubSightColors.cherryRed.withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.logout,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1587,11 +1669,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: HubSightColors.errorBg,
+              decoration: BoxDecoration(
+                color: HubSightColors.cherryRed.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.logout_rounded, color: HubSightColors.error, size: 20),
+              child: const Icon(Icons.logout_rounded, color: HubSightColors.cherryRed, size: 20),
             ),
             const SizedBox(width: 12),
             Text(
@@ -1622,7 +1704,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _handleLogout();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: HubSightColors.error,
+              backgroundColor: HubSightColors.cherryRed,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
