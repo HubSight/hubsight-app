@@ -431,65 +431,36 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         Positioned(
                           top: 10,
                           left: 12,
-                          right: 12,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF10B981),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFDC2626),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _selectedCam?.name ?? 'LIVE',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.3,
-                                      ),
-                                    ),
-                                  ],
+                                const SizedBox(width: 6),
+                                Text(
+                                  _selectedCam?.name ?? 'LIVE',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
                                 ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white12),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.hd_rounded, size: 14, color: Colors.white70),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '1080p',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -853,7 +824,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       shape: BoxShape.circle,
                       color: isStopped
                           ? const Color(0xFFEF4444)
-                          : (isSelected ? HubSightColors.primary : const Color(0xFF10B981)),
+                          : const Color(0xFF10B981),
                     ),
                   ),
                   const SizedBox(width: 6),
