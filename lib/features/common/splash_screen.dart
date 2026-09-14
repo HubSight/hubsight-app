@@ -223,11 +223,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.videocam_rounded,
-                          size: 40,
-                          color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(13),
+                        child: Image.asset(
+                          'assets/images/hubsight-mark.png',
+                          key: const Key('hubsight-brand-mark'),
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),

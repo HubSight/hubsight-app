@@ -65,8 +65,8 @@ void main() {
       // Brand Title
       expect(find.text('HubSight'), findsOneWidget);
 
-      // Camera Icon
-      expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
+      // Official HubSight brand mark
+      expect(find.byKey(const Key('hubsight-brand-mark')), findsOneWidget);
 
       // Vietnamese Tagline & Subtitle
       expect(find.text('Giám sát & Quản trị Camera Thông minh'), findsOneWidget);

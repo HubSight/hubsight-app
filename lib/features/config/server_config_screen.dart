@@ -85,28 +85,6 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       formats: const [BarcodeFormat.qrCode],
       detectionSpeed: DetectionSpeed.normal,
     );
-    if (widget.initialStep == ConfigWizardStep.summary && _decryptedConfig == null) {
-      _decryptedConfig = const HubSightAppConfig(
-        urls: HubSightUrls(
-          gatewayUrl: 'https://cctv.quoctran.space',
-          apiBaseUrl: 'https://cctv.quoctran.space/api',
-          relayWsUrl: 'wss://cctv.quoctran.space/relay',
-          webrtcBaseUrl: 'https://cctv.quoctran.space:8555',
-        ),
-        key: HubSightClientKey(
-          clientId: 'hs_client_892b1a',
-          clientSecret: 'hs_sec_9941a',
-          clientName: 'HubSight Mobile Client',
-        ),
-        metadata: HubSightConfigMetadata(
-          formatVersion: '1.0',
-          configId: 'cfg_89f02e1a',
-          name: 'HubSight HQ Security Enclave',
-          createdBy: 'SecOps Administrator',
-          createdAtUtc: '2026-09-13T10:00:00Z',
-        ),
-      );
-    }
     if (widget.initialStep == ConfigWizardStep.enterPin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -196,12 +174,24 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
         }
         if (bytes != null) {
           final loadedBytes = bytes;
-          setState(() {
-            _configBytes = loadedBytes;
-            _configFileName = file.name;
-            _configFileSize = loadedBytes.length;
-            _errorMessage = null;
-          });
+          if (!file.name.toLowerCase().endsWith('.hscfg') ||
+              !_looksLikeHscfgContainer(loadedBytes)) {
+            if (mounted) {
+              setState(() => _errorMessage = l10n?.errConfigDecryptionFailed ??
+                  'Invalid HubSight configuration file.');
+            }
+            return;
+          }
+          if (mounted) {
+            setState(() {
+              _configBytes = loadedBytes;
+              _configFileName = file.name;
+              _configFileSize = loadedBytes.length;
+              _decryptedConfig = null;
+              _pinController.clear();
+              _errorMessage = null;
+            });
+          }
         }
       }
     } catch (e) {
@@ -212,8 +202,17 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     }
   }
 
+  bool _looksLikeHscfgContainer(Uint8List bytes) {
+    const magic = [0x48, 0x53, 0x43, 0x46, 0x47, 0x01];
+    if (bytes.length < 50) return false;
+    for (var i = 0; i < magic.length; i++) {
+      if (bytes[i] != magic[i]) return false;
+    }
+    return true;
+  }
+
   // ===========================================================================
-  // Step 3b: QR Scanner & OS Temp Download Handlers
+  // Step 3b: QR Scanner & Verified In-Memory Download Handlers
   // ===========================================================================
 
   void _onDetectBarcode(BarcodeCapture capture, AppLocalizations l10n) {
@@ -248,6 +247,15 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     try {
       payload = HubSightQRPayload.fromString(rawData);
     } catch (_) {
+      setState(() => _errorMessage = l10n.scanQrInvalidPayload);
+      return;
+    }
+
+    final downloadUri = Uri.tryParse(payload.downloadUrl);
+    if (payload.configId.trim().isEmpty ||
+        downloadUri == null ||
+        !downloadUri.hasAuthority ||
+        (downloadUri.scheme != 'https' && downloadUri.scheme != 'http')) {
       setState(() => _errorMessage = l10n.scanQrInvalidPayload);
       return;
     }
@@ -289,13 +297,14 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
         }
       }
 
-      // 3. Save config file to OS temporary folder
-      final tempDir = Directory.systemTemp;
-      final safeId = payload.configId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final tempFilePath = '${tempDir.path}/.hubsight_config_$safeId.hscfg';
-      final tempFile = File(tempFilePath);
-      await tempFile.writeAsBytes(downloadedBytes);
+      if (!_looksLikeHscfgContainer(downloadedBytes)) {
+        throw HubSightConfigException(
+          code: HubSightErrorCode.configCorrupted,
+          developerMessage: l10n.errConfigDecryptionFailed,
+        );
+      }
 
+      final safeId = payload.configId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       if (mounted) {
         setState(() {
           _configBytes = downloadedBytes;
@@ -331,7 +340,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       setState(() => _errorMessage = l10n.configNoFileSelectedError);
       return;
     }
-    if (pin.length != 6 || int.tryParse(pin) == null) {
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
       setState(() => _errorMessage = l10n.errConfigInvalidPin);
       return;
     }
@@ -371,6 +380,22 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     }
   }
 
+  void _resetWizard() {
+    _pinController.clear();
+    setState(() {
+      _selectedMethod = ConfigMethod.qr;
+      _configBytes = null;
+      _configFileName = null;
+      _configFileSize = null;
+      _qrPayload = null;
+      _decryptedConfig = null;
+      _isLoading = false;
+      _loadingMessage = '';
+      _errorMessage = null;
+      _currentStep = ConfigWizardStep.welcome;
+    });
+  }
+
   // ===========================================================================
   // Step 5: Save Config & Navigate to Login Handler
   // ===========================================================================
@@ -384,7 +409,10 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     });
 
     try {
-      // Initialize SDK and persist config securely
+      // Clear credentials tied to the previous server before activating the new profile.
+      await ref.read(hubsightSdkProvider)?.auth.logout();
+
+      // Initialize SDK and persist only after explicit user confirmation.
       await ref.read(hubsightSdkProvider.notifier).initializeFromConfig(_decryptedConfig!);
 
       if (mounted) {
@@ -406,7 +434,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
         setState(() {
           _isLoading = false;
           _loadingMessage = '';
-          _errorMessage = l10n.configSaveError(e.toString());
+          _errorMessage = l10n.configSaveError(AppErrorLocalizer.localize(e, l10n));
         });
       }
     }
@@ -792,10 +820,12 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.shield_rounded,
-                  color: Colors.white,
-                  size: 42,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Image.asset(
+                    'assets/images/hubsight-mark.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ],
@@ -1648,6 +1678,10 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       controller: _pinController,
                       focusNode: _pinFocusNode,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
                       maxLength: 6,
                       autofocus: true,
                       showCursor: false,
@@ -1865,7 +1899,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        l10n.configSignatureValid,
+                        cfg.metadata.signature?.isNotEmpty == true
+                            ? l10n.configSignatureValid
+                            : l10n.configDecryptionSuccess,
                         style: const TextStyle(fontSize: 12, color: Color(0xFF34D399)),
                       ),
                     ],
@@ -1981,7 +2017,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
             width: double.infinity,
             height: 48,
             child: TextButton(
-              onPressed: () => _goToStep(ConfigWizardStep.welcome),
+              onPressed: _resetWizard,
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white.withValues(alpha: 0.6),
               ),

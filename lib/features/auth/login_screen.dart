@@ -842,13 +842,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         ),
                                       ],
                                     ),
-                                    child: Icon(
-                                      _showTwoFactorModal
-                                          ? Icons.shield_outlined
-                                          : Icons.camera_alt_rounded,
-                                      color: Colors.white,
-                                      size: 26,
-                                    ),
+                                    child: _showTwoFactorModal
+                                        ? const Icon(
+                                            Icons.shield_outlined,
+                                            color: Colors.white,
+                                            size: 26,
+                                          )
+                                        : Padding(
+                                            padding: const EdgeInsets.all(9),
+                                            child: Image.asset(
+                                              'assets/images/hubsight-mark.png',
+                                              fit: BoxFit.contain,
+                                            ),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),

@@ -116,7 +116,6 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
 
     return Scaffold(
       backgroundColor: context.bgAdaptive,
-      extendBody: true,
       body: IndexedStack(
         index: currentIndex,
         children: tabs,
