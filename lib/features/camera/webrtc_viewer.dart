@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../l10n/app_localizations.dart';
 
 class OverlayBox {
   final double x1;
@@ -95,6 +96,30 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
   static const int _maxAutoRetries = 2;
   Timer? _retryTimer;
   bool _showFullscreenPtzPad = false;
+  DateTime? _lastPtzGestureTime;
+  Offset _ptzAccumulatedDelta = Offset.zero;
+
+  void _handlePtzPanUpdate(DragUpdateDetails details) {
+    if (!widget.hasPtz) return;
+    _ptzAccumulatedDelta += details.delta;
+    final now = DateTime.now();
+    if (_lastPtzGestureTime != null && now.difference(_lastPtzGestureTime!).inMilliseconds < 150) {
+      return;
+    }
+    const threshold = 16.0;
+    if (_ptzAccumulatedDelta.distance > threshold) {
+      final dx = _ptzAccumulatedDelta.dx;
+      final dy = _ptzAccumulatedDelta.dy;
+      final pan = (dx / 80.0).clamp(-0.35, 0.35);
+      final tilt = (-dy / 80.0).clamp(-0.35, 0.35);
+
+      _ptzAccumulatedDelta = Offset.zero;
+      _lastPtzGestureTime = now;
+
+      final sdk = ref.read(hubsightSdkProvider);
+      sdk?.cameras.relativeMove(widget.cameraId, pan: pan, tilt: tilt).catchError((_) {});
+    }
+  }
 
   final ValueNotifier<List<OverlayBox>> _boxesNotifier = ValueNotifier<List<OverlayBox>>([]);
 
@@ -115,18 +140,25 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
     }
   }
 
-  String _formatErrorMessage(dynamic error) {
+  String _formatErrorMessage(dynamic error, [AppLocalizations? l10n]) {
+    if (error == null) return '';
+    if (error == 'sdk_not_ready') {
+      return l10n?.webrtcErrSdkNotReady ?? 'SDK chưa được khởi tạo';
+    }
+    if (error == 'stream_failed') {
+      return l10n?.webrtcErrStreamFailed ?? 'Không thể kết nối luồng trực tiếp.';
+    }
     final str = error.toString();
     if (str.contains('502') || str.contains('503') || str.contains('connection refused') || str.contains('Bad Gateway')) {
-      return 'Máy chủ hoặc kết nối camera đang tạm thời gián đoạn (502 Bad Gateway). Đang thử lại...';
+      return l10n?.webrtcErrBadGateway ?? 'Máy chủ hoặc kết nối camera đang tạm thời gián đoạn (502 Bad Gateway). Đang thử lại...';
     } else if (str.contains('404') || str.contains('not found')) {
-      return 'Camera không tồn tại hoặc đã bị gỡ khỏi hệ thống.';
+      return l10n?.webrtcErrNotFound ?? 'Camera không tồn tại hoặc đã bị gỡ khỏi hệ thống.';
     } else if (str.contains('401') || str.contains('403')) {
-      return 'Phiên đăng nhập đã hết hạn hoặc không có quyền xem camera này.';
+      return l10n?.webrtcErrUnauthorized ?? 'Phiên đăng nhập đã hết hạn hoặc không có quyền xem camera này.';
     } else if (str.contains('SocketException') || str.contains('TimeoutException')) {
-      return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
+      return l10n?.webrtcErrNetwork ?? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
     }
-    return 'Lỗi kết nối camera: $error';
+    return l10n?.webrtcErrConnection(error.toString()) ?? 'Lỗi kết nối camera: $error';
   }
 
   void _handleStreamError(dynamic error) {
@@ -135,7 +167,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
       _retryCount++;
       setState(() {
         _isInitializing = true;
-        _errorMessage = 'Đang tự động kết nối lại luồng video ($_retryCount/$_maxAutoRetries)...';
+        _errorMessage = null;
       });
       _retryTimer?.cancel();
       _retryTimer = Timer(const Duration(seconds: 2), () {
@@ -150,7 +182,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
     if (mounted) {
       setState(() {
         _isInitializing = false;
-        _errorMessage = _formatErrorMessage(error);
+        _errorMessage = error.toString();
       });
     }
   }
@@ -165,7 +197,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
     if (sdk == null) {
       setState(() {
         _isInitializing = false;
-        _errorMessage = 'SDK chưa được khởi tạo';
+        _errorMessage = 'sdk_not_ready';
       });
       return;
     }
@@ -189,7 +221,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
         });
         widget.onLiveStatusChange?.call(true);
       } else if (status == StreamStatus.failed) {
-        _handleStreamError('Không thể kết nối luồng trực tiếp.');
+        _handleStreamError('stream_failed');
       }
     });
 
@@ -277,6 +309,8 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       color: Colors.black,
       child: Stack(
@@ -285,10 +319,15 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
           // 1. RTC Video Renderer (Isolated in RepaintBoundary to eliminate frame composite jank)
           if (!_isInitializing && _errorMessage == null && _renderer != null)
             RepaintBoundary(
-              child: RTCVideoView(
-                _renderer!,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                filterQuality: FilterQuality.none,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onPanUpdate: widget.hasPtz ? _handlePtzPanUpdate : null,
+                onPanEnd: widget.hasPtz ? (_) => _ptzAccumulatedDelta = Offset.zero : null,
+                child: RTCVideoView(
+                  _renderer!,
+                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                  filterQuality: FilterQuality.none,
+                ),
               ),
             ),
 
@@ -316,11 +355,11 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
               if (fallenCount == 0) return const SizedBox.shrink();
               return Positioned(
                 top: 12,
-                right: 12,
+                left: 12,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
+                    color: const Color(0xFFDC2626),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
@@ -336,7 +375,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                       const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 16),
                       const SizedBox(width: 6),
                       Text(
-                        'CẢNH BÁO: TÉ NGÃ ($fallenCount)',
+                        l10n?.fallAlertWarning(fallenCount) ?? 'CẢNH BÁO: TÉ NGÃ ($fallenCount)',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11.5,
@@ -354,18 +393,21 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
           if (_isInitializing)
             Container(
               color: Colors.black54,
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(
+                    const CircularProgressIndicator(
                       color: Color(0xFFE85D10),
                       strokeWidth: 3,
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Text(
-                      'Đang kết nối WebRTC (WHEP)...',
-                      style: TextStyle(
+                      _retryCount > 0
+                          ? (l10n?.webrtcReconnecting(_retryCount, _maxAutoRetries) ??
+                              'Đang tự động kết nối lại luồng video ($_retryCount/$_maxAutoRetries)...')
+                          : (l10n?.webrtcConnecting ?? 'Đang kết nối WebRTC (WHEP)...'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -377,7 +419,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
             ),
 
           // 5. Error Overlay with Retry
-          if (_errorMessage != null)
+          if (_errorMessage != null && !_isInitializing)
             Container(
               color: const Color(0xFF0F172A),
               padding: const EdgeInsets.all(24),
@@ -387,9 +429,9 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                   children: [
                     const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 44),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Luồng trực tiếp không khả dụng',
-                      style: TextStyle(
+                    Text(
+                      l10n?.webrtcStreamUnavailable ?? 'Luồng trực tiếp không khả dụng',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14.5,
                         fontWeight: FontWeight.bold,
@@ -397,7 +439,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _errorMessage!,
+                      _formatErrorMessage(_errorMessage, l10n),
                       style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                       textAlign: TextAlign.center,
                       maxLines: 2,
@@ -417,7 +459,7 @@ class _WebRTCViewerState extends ConsumerState<WebRTCViewer> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Thử lại', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      label: Text(l10n?.retryButton ?? 'Thử lại', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

@@ -136,50 +136,33 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
     required int unreadCount,
     required AppLocalizations l10n,
   }) {
-    return SafeArea(
-      top: false,
-      bottom: true,
-      minimum: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Container(
-              key: const Key('main-navigation-dock'),
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                color: context.isDarkMode
-                    ? const Color(0xFF1B202A).withValues(alpha: 0.86)
-                    : Colors.white.withValues(alpha: 0.88),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(
-                  color: context.isDarkMode
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.08),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: context.isDarkMode
-                        ? Colors.black.withValues(alpha: 0.45)
-                        : Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 24,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: context.isDarkMode
-                        ? Colors.black.withValues(alpha: 0.20)
-                        : Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+    final isDark = context.isDarkMode;
+    final backgroundColor = isDark
+        ? const Color(0xFF090D14).withValues(alpha: 0.88)
+        : Colors.white.withValues(alpha: 0.92);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFE2E8F0);
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          key: const Key('main-navigation-dock'),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            border: Border(
+              top: BorderSide(
+                color: borderColor,
+                width: 0.75,
               ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            bottom: true,
+            child: SizedBox(
+              height: 58,
               child: Row(
                 children: [
                   _buildTabItem(
@@ -229,9 +212,10 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
     int badgeCount = 0,
   }) {
     final isSelected = index == currentIndex;
-    final inactiveColor = context.isDarkMode
+    final isDark = context.isDarkMode;
+    final inactiveColor = isDark
         ? const Color(0xFF8E95A3)
-        : const Color(0xFF6B7280);
+        : const Color(0xFF64748B);
     const activeColor = HubSightColors.primary;
 
     return Expanded(
@@ -249,84 +233,80 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
                 ref.read(mainTabIndexProvider.notifier).state = index;
               }
             },
-            borderRadius: BorderRadius.circular(22),
-            splashColor: HubSightColors.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            splashColor: HubSightColors.primary.withValues(alpha: 0.08),
             highlightColor: Colors.transparent,
-            child: SizedBox(
-              height: 56,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 5, bottom: 3),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  AnimatedScale(
-                    scale: isSelected ? 1.06 : 1.0,
-                    duration: const Duration(milliseconds: 200),
+                  // Active icon soft pill indicator
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        if (isSelected)
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: HubSightColors.primary.withValues(
-                                    alpha: context.isDarkMode ? 0.38 : 0.24,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? HubSightColors.primary.withValues(alpha: isDark ? 0.16 : 0.12)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: AnimatedScale(
+                      scale: isSelected ? 1.05 : 1.0,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            switchInCurve: Curves.easeOutBack,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder: (child, animation) => FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                            child: Icon(
+                              isSelected ? activeIcon : inactiveIcon,
+                              key: ValueKey(isSelected),
+                              size: 22,
+                              color: isSelected ? activeColor : inactiveColor,
+                            ),
+                          ),
+                          if (badgeCount > 0)
+                            Positioned(
+                              top: -3,
+                              right: -10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                decoration: BoxDecoration(
+                                  color: HubSightColors.error,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? const Color(0xFF090D14)
+                                        : Colors.white,
+                                    width: 1.5,
                                   ),
-                                  blurRadius: 14,
-                                  spreadRadius: 2,
                                 ),
-                              ],
-                            ),
-                          ),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          switchInCurve: Curves.easeOutBack,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, animation) => FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          ),
-                          child: Icon(
-                            isSelected ? activeIcon : inactiveIcon,
-                            key: ValueKey(isSelected),
-                            size: 22,
-                            color: isSelected ? activeColor : inactiveColor,
-                          ),
-                        ),
-                        if (badgeCount > 0)
-                          Positioned(
-                            top: -4,
-                            right: -9,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                              decoration: BoxDecoration(
-                                color: HubSightColors.error,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: context.isDarkMode
-                                      ? const Color(0xFF1B202A)
-                                      : Colors.white,
-                                  width: 1.5,
+                                child: Text(
+                                  badgeCount > 99 ? '99+' : '$badgeCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.1,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
-                              child: Text(
-                                badgeCount > 99 ? '99+' : '$badgeCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.1,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -335,9 +315,9 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
                     curve: Curves.easeOutCubic,
                     style: TextStyle(
                       fontSize: 10.5,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       color: isSelected ? activeColor : inactiveColor,
-                      letterSpacing: isSelected ? -0.1 : -0.05,
+                      letterSpacing: isSelected ? -0.2 : -0.1,
                       height: 1.1,
                     ),
                     child: Text(

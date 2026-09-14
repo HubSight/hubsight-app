@@ -10,6 +10,7 @@ import 'package:hubsight_app/core/storage/storage_service.dart';
 import 'package:hubsight_app/features/camera/ptz_bottom_sheet.dart';
 import 'package:hubsight_app/features/camera/onvif_discovery_sheet.dart';
 import 'package:hubsight_app/features/camera/playback_screen.dart';
+import 'package:hubsight_app/features/camera/webrtc_viewer.dart';
 
 class MockBiometricService extends BiometricService {
   MockBiometricService(super.prefs);
@@ -160,6 +161,22 @@ void main() {
         // Verify ONVIF Discovery tile exists in the picker
         expect(find.text('Dò tìm thiết bị ONVIF'), findsOneWidget);
       }
+    });
+  });
+
+  group('WebRTCViewer PTZ Gesture & Button Tests', () {
+    testWidgets('renders PTZ action button when hasPtz is true', (tester) async {
+      await tester.pumpWidget(
+        createWidgetForTesting(
+          const WebRTCViewer(
+            cameraId: 'cam-ptz-1',
+            hasPtz: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('webrtc-ptz-button')), findsOneWidget);
     });
   });
 }

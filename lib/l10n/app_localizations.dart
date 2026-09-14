@@ -1447,6 +1447,918 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter preset point name:'**
   String get presetNamePrompt;
+
+  /// No description provided for @biometricFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint'**
+  String get biometricFingerprint;
+
+  /// No description provided for @biometricIris.
+  ///
+  /// In en, this message translates to:
+  /// **'Iris'**
+  String get biometricIris;
+
+  /// No description provided for @biometricGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometrics'**
+  String get biometricGeneral;
+
+  /// No description provided for @biometricDefaultReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Please authenticate to unlock HubSight'**
+  String get biometricDefaultReason;
+
+  /// No description provided for @lockBiometricReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate {biometric} to unlock HubSight'**
+  String lockBiometricReason(Object biometric);
+
+  /// No description provided for @lockPinMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation PIN does not match. Please try again.'**
+  String get lockPinMismatch;
+
+  /// No description provided for @lockNoPinPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'No PIN set. Please unlock using {biometric}'**
+  String lockNoPinPrompt(Object biometric);
+
+  /// No description provided for @lockPinIncorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN code'**
+  String get lockPinIncorrect;
+
+  /// No description provided for @lockEnterPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PIN code to unlock'**
+  String get lockEnterPin;
+
+  /// No description provided for @lockConfirmPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter PIN to confirm'**
+  String get lockConfirmPin;
+
+  /// No description provided for @lockSetNewPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up new PIN code'**
+  String get lockSetNewPin;
+
+  /// No description provided for @lockEnterPinOrBiometric.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PIN or use {biometric}'**
+  String lockEnterPinOrBiometric(Object biometric);
+
+  /// No description provided for @lockLogoutAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout of account'**
+  String get lockLogoutAccount;
+
+  /// No description provided for @loginQuickBiometricReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sign-in with {biometric} to HubSight'**
+  String loginQuickBiometricReason(Object biometric);
+
+  /// No description provided for @serverNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Server not configured'**
+  String get serverNotConfigured;
+
+  /// No description provided for @configureServerNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure server now'**
+  String get configureServerNow;
+
+  /// No description provided for @recoveryCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 8-16 char recovery code'**
+  String get recoveryCodeHint;
+
+  /// No description provided for @useTotpCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 6-digit verification code'**
+  String get useTotpCode;
+
+  /// No description provided for @backToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to login'**
+  String get backToLogin;
+
+  /// No description provided for @onvifModeSystemCameras.
+  ///
+  /// In en, this message translates to:
+  /// **'Cameras in system'**
+  String get onvifModeSystemCameras;
+
+  /// No description provided for @onvifModeCustomIp.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom IP/Host'**
+  String get onvifModeCustomIp;
+
+  /// No description provided for @onvifHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'192.168.1.100 or hostname'**
+  String get onvifHostHint;
+
+  /// No description provided for @onvifPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'ONVIF password (if any)'**
+  String get onvifPasswordHint;
+
+  /// No description provided for @probingCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Probing...'**
+  String get probingCamera;
+
+  /// No description provided for @onvifPtzSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ Supported'**
+  String get onvifPtzSupported;
+
+  /// No description provided for @onvifDeviceInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Information'**
+  String get onvifDeviceInfo;
+
+  /// No description provided for @onvifManufacturer.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturer'**
+  String get onvifManufacturer;
+
+  /// No description provided for @onvifModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get onvifModel;
+
+  /// No description provided for @onvifFirmwareVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Firmware Version'**
+  String get onvifFirmwareVersion;
+
+  /// No description provided for @onvifSerialNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial Number'**
+  String get onvifSerialNumber;
+
+  /// No description provided for @onvifMediaProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Media Profiles'**
+  String get onvifMediaProfiles;
+
+  /// No description provided for @onvifNoProfiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not extract media profiles.'**
+  String get onvifNoProfiles;
+
+  /// No description provided for @onvifRtspCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'RTSP Stream URI copied to clipboard!'**
+  String get onvifRtspCopied;
+
+  /// No description provided for @aiAlertNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Alert: {event} at camera {camera}'**
+  String aiAlertNotification(Object camera, Object event);
+
+  /// No description provided for @allCameras.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get allCameras;
+
+  /// No description provided for @recentRecognitions.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Recognition Logs'**
+  String get recentRecognitions;
+
+  /// No description provided for @eventsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} events'**
+  String eventsCount(Object count);
+
+  /// No description provided for @noRecognitionData.
+  ///
+  /// In en, this message translates to:
+  /// **'No facial recognition data available'**
+  String get noRecognitionData;
+
+  /// No description provided for @stranger.
+  ///
+  /// In en, this message translates to:
+  /// **'Stranger'**
+  String get stranger;
+
+  /// No description provided for @noActiveStreamingCameras.
+  ///
+  /// In en, this message translates to:
+  /// **'No active cameras available for live streaming'**
+  String get noActiveStreamingCameras;
+
+  /// No description provided for @ptzPresetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Front Gate, Window, Backyard'**
+  String get ptzPresetHint;
+
+  /// No description provided for @ptzPresetSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset saved: {name}'**
+  String ptzPresetSaved(Object name);
+
+  /// No description provided for @ptzPresetSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save preset: {error}'**
+  String ptzPresetSaveFailed(Object error);
+
+  /// No description provided for @ptzDeletePresetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Preset'**
+  String get ptzDeletePresetTitle;
+
+  /// No description provided for @ptzDeletePresetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete preset \"{name}\"?'**
+  String ptzDeletePresetConfirm(Object name);
+
+  /// No description provided for @ptzPresetDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset deleted: {name}'**
+  String ptzPresetDeleted(Object name);
+
+  /// No description provided for @ptzPresetDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete preset: {error}'**
+  String ptzPresetDeleteFailed(Object error);
+
+  /// No description provided for @ptzCommandFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ command failed: {error}'**
+  String ptzCommandFailed(Object error);
+
+  /// No description provided for @ptzHoldInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold arrow buttons to pan/tilt camera, release to stop.'**
+  String get ptzHoldInstruction;
+
+  /// No description provided for @ptzNoPresets.
+  ///
+  /// In en, this message translates to:
+  /// **'No presets saved for this camera yet.'**
+  String get ptzNoPresets;
+
+  /// No description provided for @ptzMovingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Moving camera to: {name}'**
+  String ptzMovingTo(Object name);
+
+  /// No description provided for @ptzMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to move camera: {error}'**
+  String ptzMoveFailed(Object error);
+
+  /// No description provided for @webrtcErrBadGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Server or camera connection temporarily disrupted (502 Bad Gateway). Retrying...'**
+  String get webrtcErrBadGateway;
+
+  /// No description provided for @webrtcErrNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera does not exist or has been removed from system.'**
+  String get webrtcErrNotFound;
+
+  /// No description provided for @webrtcErrUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired or you do not have permission to view this camera.'**
+  String get webrtcErrUnauthorized;
+
+  /// No description provided for @webrtcErrNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot connect to server. Please check your network connection.'**
+  String get webrtcErrNetwork;
+
+  /// No description provided for @webrtcErrConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera connection error: {error}'**
+  String webrtcErrConnection(Object error);
+
+  /// No description provided for @webrtcReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting video stream automatically ({count}/{max})...'**
+  String webrtcReconnecting(Object count, Object max);
+
+  /// No description provided for @webrtcErrSdkNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'SDK has not been initialized'**
+  String get webrtcErrSdkNotReady;
+
+  /// No description provided for @webrtcErrStreamFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot connect to live stream.'**
+  String get webrtcErrStreamFailed;
+
+  /// No description provided for @fallAlertWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'WARNING: FALL DETECTED ({count})'**
+  String fallAlertWarning(Object count);
+
+  /// No description provided for @webrtcConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting WebRTC (WHEP)...'**
+  String get webrtcConnecting;
+
+  /// No description provided for @webrtcStreamUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Live stream unavailable'**
+  String get webrtcStreamUnavailable;
+
+  /// No description provided for @retryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryButton;
+
+  /// No description provided for @markAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get markAllRead;
+
+  /// No description provided for @noUnreadNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'No unread notifications'**
+  String get noUnreadNotifications;
+
+  /// No description provided for @noUnreadNotificationsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'You have reviewed all security alerts'**
+  String get noUnreadNotificationsDesc;
+
+  /// No description provided for @noNotificationsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Security alerts and AI events will appear here'**
+  String get noNotificationsDesc;
+
+  /// No description provided for @passkeyDefaultDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'{biometric} on this device'**
+  String passkeyDefaultDeviceName(Object biometric);
+
+  /// No description provided for @securitySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Security'**
+  String get securitySectionTitle;
+
+  /// No description provided for @noOtherSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No other active sessions'**
+  String get noOtherSessions;
+
+  /// No description provided for @thisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get thisDevice;
+
+  /// No description provided for @otherSessionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} other active sessions'**
+  String otherSessionsCount(Object count);
+
+  /// No description provided for @tapToCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to collapse'**
+  String get tapToCollapse;
+
+  /// No description provided for @tapToManageAndRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to manage and revoke'**
+  String get tapToManageAndRevoke;
+
+  /// No description provided for @genericDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get genericDevice;
+
+  /// No description provided for @changePinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Security PIN'**
+  String get changePinTitle;
+
+  /// No description provided for @changePinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset your backup 4-digit PIN'**
+  String get changePinSubtitle;
+
+  /// No description provided for @pinUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN code updated successfully'**
+  String get pinUpdatedSuccess;
+
+  /// No description provided for @notConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get notConfigured;
+
+  /// No description provided for @serverProfileActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile: {name} • Active'**
+  String serverProfileActive(Object name);
+
+  /// No description provided for @gatewayNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway port not connected'**
+  String get gatewayNotConnected;
+
+  /// No description provided for @confirmLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to log out of this account?'**
+  String get confirmLogout;
+
+  /// No description provided for @configPickFileError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not select file: {error}'**
+  String configPickFileError(Object error);
+
+  /// No description provided for @configQrAnalyzeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error analyzing QR image: {error}'**
+  String configQrAnalyzeError(Object error);
+
+  /// No description provided for @configNoDataFromServer.
+  ///
+  /// In en, this message translates to:
+  /// **'No data returned from configuration server.'**
+  String get configNoDataFromServer;
+
+  /// No description provided for @configNoFileSelectedError.
+  ///
+  /// In en, this message translates to:
+  /// **'No configuration file selected. Please go back to the previous step.'**
+  String get configNoFileSelectedError;
+
+  /// No description provided for @configDecryptingSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting container and verifying digital signature...'**
+  String get configDecryptingSignature;
+
+  /// No description provided for @configSavingSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving system configuration...'**
+  String get configSavingSystem;
+
+  /// No description provided for @configSuccessLoginPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Server configured successfully! Please log in.'**
+  String get configSuccessLoginPrompt;
+
+  /// No description provided for @configSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving configuration: {error}'**
+  String configSaveError(Object error);
+
+  /// No description provided for @configStepWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'HubSight Setup'**
+  String get configStepWelcome;
+
+  /// No description provided for @configStepMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Method'**
+  String get configStepMethod;
+
+  /// No description provided for @configStepPickFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Config File'**
+  String get configStepPickFile;
+
+  /// No description provided for @configStepScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR Code'**
+  String get configStepScanQr;
+
+  /// No description provided for @configStepPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Security PIN'**
+  String get configStepPin;
+
+  /// No description provided for @configStepSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Configuration'**
+  String get configStepSummary;
+
+  /// No description provided for @processing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing...'**
+  String get processing;
+
+  /// No description provided for @configWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to HubSight'**
+  String get configWelcomeTitle;
+
+  /// No description provided for @configWelcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'To connect the app to your surveillance server, please import the secure configuration container (.hscfg) or scan the QR code provided by your administrator.'**
+  String get configWelcomeSubtitle;
+
+  /// No description provided for @configFeatureE2eeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-layer End-to-End Encryption'**
+  String get configFeatureE2eeTitle;
+
+  /// No description provided for @configFeatureE2eeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Protected by Argon2id key derivation and military-grade AES-256-GCM encryption.'**
+  String get configFeatureE2eeDesc;
+
+  /// No description provided for @configFeatureEd25519Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Ed25519 Digital Signature Verification'**
+  String get configFeatureEd25519Title;
+
+  /// No description provided for @configFeatureEd25519Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Guarantees container authenticity, preventing tampering or unauthorized server redirection.'**
+  String get configFeatureEd25519Desc;
+
+  /// No description provided for @configFeatureZeroConfigTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero-Config Setup'**
+  String get configFeatureZeroConfigTitle;
+
+  /// No description provided for @configFeatureZeroConfigDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically configures Gateway, WebSocket Relay, and WebRTC in seconds.'**
+  String get configFeatureZeroConfigDesc;
+
+  /// No description provided for @configStartSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Setup'**
+  String get configStartSetup;
+
+  /// No description provided for @configSelectMethodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Connection Method'**
+  String get configSelectMethodTitle;
+
+  /// No description provided for @configSelectMethodDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the most convenient method to import connection parameters into the app:'**
+  String get configSelectMethodDesc;
+
+  /// No description provided for @configMethodQrTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Configuration QR'**
+  String get configMethodQrTitle;
+
+  /// No description provided for @configMethodQrDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use device camera to scan configuration QR code directly from computer screen or saved photo.'**
+  String get configMethodQrDesc;
+
+  /// No description provided for @configMethodRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get configMethodRecommended;
+
+  /// No description provided for @configMethodFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Config File (.hscfg)'**
+  String get configMethodFileTitle;
+
+  /// No description provided for @configMethodFileDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the secure container file (.hscfg) downloaded on your device.'**
+  String get configMethodFileDesc;
+
+  /// No description provided for @backButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get backButton;
+
+  /// No description provided for @configPickFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Config File (.hscfg)'**
+  String get configPickFileTitle;
+
+  /// No description provided for @configPickFileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the secure container file exported from the system by your administrator.'**
+  String get configPickFileSubtitle;
+
+  /// No description provided for @configTapToPickFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to select .hscfg file'**
+  String get configTapToPickFile;
+
+  /// No description provided for @configFileSizeKb.
+  ///
+  /// In en, this message translates to:
+  /// **'File size: {size} KB'**
+  String configFileSizeKb(Object size);
+
+  /// No description provided for @configStandardFormatSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Supports standard .hscfg container'**
+  String get configStandardFormatSupport;
+
+  /// No description provided for @configReadyToDecrypt.
+  ///
+  /// In en, this message translates to:
+  /// **'READY TO DECRYPT'**
+  String get configReadyToDecrypt;
+
+  /// No description provided for @configPickAnotherFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose another file'**
+  String get configPickAnotherFile;
+
+  /// No description provided for @configQrInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Point camera at configuration QR code to scan automatically'**
+  String get configQrInstruction;
+
+  /// No description provided for @configFlashTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashlight'**
+  String get configFlashTooltip;
+
+  /// No description provided for @configQrPickGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick QR from gallery'**
+  String get configQrPickGallery;
+
+  /// No description provided for @configSwitchCameraTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch camera'**
+  String get configSwitchCameraTooltip;
+
+  /// No description provided for @configQrFallbackName.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Code'**
+  String get configQrFallbackName;
+
+  /// No description provided for @configEnterPinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Security PIN (6 digits)'**
+  String get configEnterPinTitle;
+
+  /// No description provided for @configEnterPinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit PIN provided by your administrator to unpack and decrypt data container.'**
+  String get configEnterPinSubtitle;
+
+  /// No description provided for @configDecryptButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpack & Decrypt'**
+  String get configDecryptButton;
+
+  /// No description provided for @configDecryptionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Decryption & Verification Successful'**
+  String get configDecryptionSuccess;
+
+  /// No description provided for @configSignatureValid.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid Ed25519 digital signature. Authentic file.'**
+  String get configSignatureValid;
+
+  /// No description provided for @configConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Configuration Details'**
+  String get configConfirmTitle;
+
+  /// No description provided for @configConfirmSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review connection parameters carefully before saving and activating application:'**
+  String get configConfirmSubtitle;
+
+  /// No description provided for @configSummarySystemName.
+  ///
+  /// In en, this message translates to:
+  /// **'System Name'**
+  String get configSummarySystemName;
+
+  /// No description provided for @configSummaryConfigId.
+  ///
+  /// In en, this message translates to:
+  /// **'Config ID'**
+  String get configSummaryConfigId;
+
+  /// No description provided for @configSummaryGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway Server'**
+  String get configSummaryGateway;
+
+  /// No description provided for @configSummaryClientName.
+  ///
+  /// In en, this message translates to:
+  /// **'Client Name'**
+  String get configSummaryClientName;
+
+  /// No description provided for @configSummaryCreatedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Created By'**
+  String get configSummaryCreatedBy;
+
+  /// No description provided for @configSummaryCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created At'**
+  String get configSummaryCreatedAt;
+
+  /// No description provided for @none.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get none;
+
+  /// No description provided for @configSummaryProfileVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Version'**
+  String get configSummaryProfileVersion;
+
+  /// No description provided for @configConfirmAndProceed.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept & Proceed to Login'**
+  String get configConfirmAndProceed;
+
+  /// No description provided for @configResetFromScratch.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset from Beginning'**
+  String get configResetFromScratch;
+
+  /// No description provided for @splashTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Intelligent Video Surveillance & Management'**
+  String get splashTagline;
+
+  /// No description provided for @splashSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enterprise CCTV & AI Security Platform'**
+  String get splashSubtitle;
+
+  /// No description provided for @splashInitializing.
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing security environment...'**
+  String get splashInitializing;
+
+  /// No description provided for @liveTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get liveTab;
+
+  /// No description provided for @playbackTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get playbackTab;
+
+  /// No description provided for @ptzControlPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ Controls'**
+  String get ptzControlPanel;
+
+  /// No description provided for @ptzSwipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe video to steer camera'**
+  String get ptzSwipeHint;
+
+  /// No description provided for @ptzQuickAction.
+  ///
+  /// In en, this message translates to:
+  /// **'PTZ Control'**
+  String get ptzQuickAction;
 }
 
 class _AppLocalizationsDelegate

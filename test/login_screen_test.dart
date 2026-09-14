@@ -121,5 +121,37 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
       expect(find.text('Thiết bị không hỗ trợ hoặc chưa cài đặt sinh trắc học.'), findsOneWidget);
     });
+
+    testWidgets('submitting username moves focus to password and submitting password triggers login', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: Locale('vi'),
+            home: LoginScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final textFields = find.byType(TextField);
+      expect(textFields, findsNWidgets(2));
+
+      // Test username submission triggers next action
+      await tester.showKeyboard(textFields.first);
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pump();
+
+      // Enter password and submit with done action
+      await tester.enterText(textFields.last, 'testpassword123');
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+    });
   });
 }

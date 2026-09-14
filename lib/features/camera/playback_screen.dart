@@ -69,10 +69,171 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
     }
   }
 
+  List<PresetItem> _ptzPresets = [];
+  bool _isLoadingPtzPresets = false;
+  bool _isPtzExpanded = true;
+  bool _showInlinePtz = false;
+
   void _openPtzController() {
     if (_selectedCam == null) return;
     HapticFeedback.lightImpact();
-    PtzBottomSheet.show(context, camera: _selectedCam!);
+    PtzBottomSheet.show(context, camera: _selectedCam!).then((_) {
+      _fetchPtzPresets();
+    });
+  }
+
+  Future<void> _fetchPtzPresets() async {
+    final cam = _selectedCam;
+    if (cam == null || !cam.onvifPtzSupported) {
+      if (mounted) setState(() => _ptzPresets = []);
+      return;
+    }
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) return;
+    if (mounted) setState(() => _isLoadingPtzPresets = true);
+    try {
+      final presets = await sdk.cameras.getPresets(cam.id);
+      if (mounted) {
+        setState(() {
+          _ptzPresets = presets;
+          _isLoadingPtzPresets = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingPtzPresets = false);
+    }
+  }
+
+  Future<void> _gotoPreset(PresetItem preset) async {
+    final cam = _selectedCam;
+    if (cam == null) return;
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) return;
+    final l10n = AppLocalizations.of(context)!;
+    HapticFeedback.lightImpact();
+    try {
+      await sdk.cameras.gotoPreset(cam.id, preset.token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.ptzMovingTo(preset.name)),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.ptzMoveFailed(e.toString())),
+            backgroundColor: HubSightColors.error,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleAddNewPresetInline(AppLocalizations l10n) async {
+    final cam = _selectedCam;
+    if (cam == null) return;
+    final nameController = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardAdaptive,
+        shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
+        title: Row(
+          children: [
+            const Icon(Icons.bookmark_add_rounded, color: HubSightColors.primary, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              l10n.addPreset,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.presetNamePrompt,
+              style: TextStyle(fontSize: 13, color: context.textSecondaryAdaptive),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              style: TextStyle(color: context.textPrimaryAdaptive),
+              decoration: InputDecoration(
+                hintText: l10n.ptzPresetHint,
+                hintStyle: TextStyle(color: context.textMutedAdaptive),
+                filled: true,
+                fillColor: context.surfaceAdaptive,
+                border: OutlineInputBorder(
+                  borderRadius: HubSightRadius.roundedLg,
+                  borderSide: BorderSide(color: context.borderAdaptive),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.cancel, style: TextStyle(color: context.textSecondaryAdaptive)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: HubSightColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedLg),
+            ),
+            onPressed: () {
+              final name = nameController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.of(ctx).pop(name);
+              }
+            },
+            child: Text(l10n.addPreset, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      final sdk = ref.read(hubsightSdkProvider);
+      if (sdk == null) return;
+      try {
+        final newPreset = await sdk.cameras.setPreset(cam.id, result);
+        if (mounted) {
+          setState(() {
+            _ptzPresets.add(newPreset);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.ptzPresetSaved(result)),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.ptzPresetSaveFailed(e.toString())),
+              backgroundColor: HubSightColors.error,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   // Mode: 'live' | 'archive'
@@ -118,6 +279,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         }
         _lastAlertSnackBarTime = now;
 
+        final l10n = mounted ? AppLocalizations.of(context) : null;
+        final alertText = l10n?.aiAlertNotification(
+          event.title.isNotEmpty ? event.title : event.eventType,
+          event.cameraId,
+        ) ?? 'Cảnh báo AI: ${event.title.isNotEmpty ? event.title : event.eventType} tại camera ${event.cameraId}';
+
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -126,7 +293,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                 const Icon(Icons.warning_amber_rounded, color: Colors.white),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Cảnh báo AI: ${event.title.isNotEmpty ? event.title : event.eventType} tại camera ${event.cameraId}'),
+                  child: Text(alertText),
                 ),
               ],
             ),
@@ -177,6 +344,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
             if (_cameras.isNotEmpty && _selectedCam == null) {
               _selectedCam = _cameras.firstWhere((c) => !c.isStopped, orElse: () => _cameras.first);
+              _showInlinePtz = _selectedCam?.onvifPtzSupported == true || _selectedCam?.onvifEnabled == true;
             }
             _isLoadingCameras = false;
           });
@@ -185,6 +353,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             _fetchAvailableDays();
             _fetchTimeline();
             _fetchRecognitionLogs();
+            _fetchPtzPresets();
           }
         }
       }
@@ -291,10 +460,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       _mode = 'live';
       _activeRecording = null;
       _recordings = [];
+      _showInlinePtz = cam.onvifPtzSupported || cam.onvifEnabled;
     });
     _fetchAvailableDays();
     _fetchTimeline();
     _fetchRecognitionLogs();
+    _fetchPtzPresets();
   }
 
   void _onSelectDate(DateTime date) {
@@ -505,7 +676,11 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               // 2. Horizontal Quick Camera Selector Bar
               _buildCameraQuickBar(l10n),
 
-              // 3. Unified Timeline & Playback Section
+              // 3. Inline PTZ Controller Panel (Live PTZ)
+              if ((_selectedCam?.onvifPtzSupported == true) || (_selectedCam?.onvifEnabled == true) || _showInlinePtz)
+                _buildInlinePtzSection(l10n),
+
+              // 4. Unified Timeline & Playback Section
               _buildUnifiedTimelineSection(dateFormatted, l10n),
 
               Padding(
@@ -543,7 +718,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       isFullscreen: isFullscreen,
                       onToggleFullscreen: _toggleFullscreen,
                       streamReloadIndex: _streamReloadIndex,
-                      hasPtz: _selectedCam?.onvifPtzSupported ?? false,
+                      hasPtz: (_selectedCam?.onvifPtzSupported ?? false) || (_selectedCam?.onvifEnabled ?? false) || _showInlinePtz,
                       onOpenPtz: _openPtzController,
                     ),
                     // Top Video Info Bar (portrait only)
@@ -579,7 +754,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   letterSpacing: 0.3,
                                 ),
                               ),
-                              if (_selectedCam?.onvifPtzSupported == true) ...[
+                              if ((_selectedCam?.onvifPtzSupported == true) || _showInlinePtz) ...[
                                 const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -604,7 +779,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         ),
                       ),
                     // Top-right PTZ Controller Shortcut Button (portrait only)
-                    if (!isFullscreen && _selectedCam?.onvifPtzSupported == true)
+                    if (!isFullscreen && ((_selectedCam?.onvifPtzSupported == true) || _showInlinePtz))
                       Positioned(
                         top: 10,
                         right: 12,
@@ -753,7 +928,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
                   ),
                   icon: const Icon(Icons.radio_button_checked, size: 13),
-                  label: const Text('Trực tiếp', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  label: Text(l10n.live, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -981,7 +1156,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         controller: _cameraScrollController,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         scrollDirection: Axis.horizontal,
-        itemCount: _cameras.length + 1,
+        itemCount: _cameras.length + 2,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           if (index == _cameras.length) {
@@ -1005,11 +1180,61 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     Icon(Icons.tune_rounded, size: 14, color: context.textSecondaryAdaptive),
                     const SizedBox(width: 4),
                     Text(
-                      'Tất cả',
+                      l10n.allCameras,
                       style: TextStyle(
                         fontSize: 12,
                         color: context.textSecondaryAdaptive,
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          if (index == _cameras.length + 1) {
+            final isPtzActive = (_selectedCam?.onvifPtzSupported == true) || _showInlinePtz;
+            return InkWell(
+              key: const Key('quick-ptz-toggle-chip'),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _showInlinePtz = !_showInlinePtz;
+                });
+                if (_showInlinePtz) {
+                  _fetchPtzPresets();
+                }
+              },
+              borderRadius: HubSightRadius.roundedFull,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPtzActive
+                      ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
+                      : context.surfaceAdaptive,
+                  borderRadius: HubSightRadius.roundedFull,
+                  border: Border.all(
+                    color: isPtzActive ? const Color(0xFF3B82F6) : context.borderAdaptive,
+                    width: isPtzActive ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.control_camera_rounded,
+                      size: 14,
+                      color: isPtzActive ? const Color(0xFF3B82F6) : context.textSecondaryAdaptive,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'PTZ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isPtzActive ? const Color(0xFF3B82F6) : context.textSecondaryAdaptive,
+                        fontWeight: isPtzActive ? FontWeight.bold : FontWeight.w500,
                       ),
                     ),
                   ],
@@ -1078,6 +1303,277 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildInlinePtzSection(AppLocalizations l10n) {
+    final sdk = ref.watch(hubsightSdkProvider);
+    final cam = _selectedCam;
+    if (cam == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.cardAdaptive,
+          borderRadius: HubSightRadius.roundedXxl,
+          border: Border.all(color: context.borderAdaptive),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row: Icon, Title, ONVIF Profile S badge, Expand/Collapse & Popout
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: HubSightColors.primary.withValues(alpha: 0.12),
+                    borderRadius: HubSightRadius.roundedLg,
+                  ),
+                  child: const Icon(
+                    Icons.control_camera_rounded,
+                    color: HubSightColors.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            l10n.ptzControlPanel,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: context.textPrimaryAdaptive,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                            ),
+                            child: const Text(
+                              'Profile S',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF10B981),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        l10n.ptzSwipeHint,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.textMutedAdaptive,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.open_in_full_rounded, size: 17),
+                  color: context.textSecondaryAdaptive,
+                  tooltip: l10n.ptzControl,
+                  onPressed: _openPtzController,
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isPtzExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                  ),
+                  color: context.textSecondaryAdaptive,
+                  onPressed: () => setState(() => _isPtzExpanded = !_isPtzExpanded),
+                ),
+              ],
+            ),
+
+            if (_isPtzExpanded) ...[
+              const SizedBox(height: 10),
+              Divider(height: 1, color: context.borderAdaptive),
+              const SizedBox(height: 12),
+
+              // D-Pad and Zoom Controller
+              Center(
+                child: HubSightPtzPad(
+                  key: const Key('inline-ptz-dpad'),
+                  cameraId: cam.id,
+                  cameraService: sdk?.cameras,
+                  buttonSize: 44.0,
+                  iconSize: 22.0,
+                  spacing: 8.0,
+                  padding: const EdgeInsets.all(12.0),
+                  borderRadius: 20.0,
+                  backgroundColor: context.surfaceAdaptive,
+                  buttonColor: context.cardAdaptive,
+                  buttonBorderColor: context.borderAdaptive,
+                  iconColor: context.textPrimaryAdaptive,
+                  stopButtonColor: HubSightColors.error.withValues(alpha: 0.2),
+                  stopIconColor: HubSightColors.error,
+                  onError: (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.ptzCommandFailed(e.toString())),
+                          backgroundColor: HubSightColors.error,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  l10n.ptzHoldInstruction,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: context.textMutedAdaptive,
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 12),
+            Divider(height: 1, color: context.borderAdaptive),
+            const SizedBox(height: 10),
+
+            // Presets Header & List
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bookmark_rounded, size: 14, color: context.textSecondaryAdaptive),
+                    const SizedBox(width: 6),
+                    Text(
+                      l10n.presetsTitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimaryAdaptive,
+                      ),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  key: const Key('inline-add-preset-button'),
+                  onTap: () => _handleAddNewPresetInline(l10n),
+                  borderRadius: HubSightRadius.roundedLg,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: HubSightColors.primary.withValues(alpha: 0.12),
+                      borderRadius: HubSightRadius.roundedLg,
+                      border: Border.all(color: HubSightColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.add_rounded, size: 13, color: HubSightColors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          l10n.addPreset,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: HubSightColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            if (_isLoadingPtzPresets)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: HubSightColors.primary),
+                  ),
+                ),
+              )
+            else if (_ptzPresets.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Center(
+                  child: Text(
+                    l10n.ptzNoPresets,
+                    style: TextStyle(fontSize: 11.5, color: context.textMutedAdaptive),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: 36,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _ptzPresets.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final preset = _ptzPresets[index];
+                    return InkWell(
+                      key: Key('preset-chip-${preset.token}'),
+                      onTap: () => _gotoPreset(preset),
+                      borderRadius: HubSightRadius.roundedXl,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: context.surfaceAdaptive,
+                          borderRadius: HubSightRadius.roundedXl,
+                          border: Border.all(color: context.borderAdaptive),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 13, color: HubSightColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              preset.name,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: context.textPrimaryAdaptive,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1624,13 +2120,13 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   const Icon(Icons.face_retouching_natural_rounded, color: HubSightColors.primary, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'Nhật ký nhận diện gần đây',
+                    l10n.recentRecognitions,
                     style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
                   ),
                 ],
               ),
               Text(
-                '${_recognitionLogs.length} sự kiện',
+                l10n.eventsCount(_recognitionLogs.length),
                 style: TextStyle(fontSize: 11, color: context.textMutedAdaptive),
               ),
             ],
@@ -1662,7 +2158,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                   Icon(Icons.face_outlined, size: 16, color: context.textMutedAdaptive),
                   const SizedBox(width: 8),
                   Text(
-                    'Chưa có dữ liệu nhận diện khuôn mặt',
+                    l10n.noRecognitionData,
                     style: TextStyle(color: context.textMutedAdaptive, fontSize: 12),
                   ),
                 ],
@@ -1684,7 +2180,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                     backgroundImage: log.thumbnailUrl != null ? NetworkImage(log.thumbnailUrl!) : null,
                     child: log.thumbnailUrl == null ? Icon(Icons.person, color: context.textSecondaryAdaptive, size: 16) : null,
                   ),
-                  title: Text(log.memberName ?? 'Người lạ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive)),
+                  title: Text(log.memberName ?? l10n.stranger, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive)),
                   subtitle: Text(log.createdAt, style: TextStyle(fontSize: 10.5, color: context.textMutedAdaptive)),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

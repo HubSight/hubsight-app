@@ -759,4 +759,534 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get presetNamePrompt => 'Nhập tên điểm nhớ vị trí:';
+
+  @override
+  String get biometricFingerprint => 'Vân tay';
+
+  @override
+  String get biometricIris => 'Mống mắt';
+
+  @override
+  String get biometricGeneral => 'Sinh trắc học';
+
+  @override
+  String get biometricDefaultReason => 'Vui lòng xác thực để mở khóa HubSight';
+
+  @override
+  String lockBiometricReason(Object biometric) {
+    return 'Xác thực $biometric để mở khóa HubSight';
+  }
+
+  @override
+  String get lockPinMismatch => 'Mã PIN xác nhận không khớp. Vui lòng thử lại.';
+
+  @override
+  String lockNoPinPrompt(Object biometric) {
+    return 'Chưa có mã PIN. Vui lòng mở khóa bằng $biometric';
+  }
+
+  @override
+  String get lockPinIncorrect => 'Mã PIN không chính xác';
+
+  @override
+  String get lockEnterPin => 'Nhập mã PIN để mở khóa';
+
+  @override
+  String get lockConfirmPin => 'Xác nhận lại mã PIN';
+
+  @override
+  String get lockSetNewPin => 'Thiết lập mã PIN mới';
+
+  @override
+  String lockEnterPinOrBiometric(Object biometric) {
+    return 'Nhập PIN hoặc dùng $biometric';
+  }
+
+  @override
+  String get lockLogoutAccount => 'Đăng xuất khỏi tài khoản';
+
+  @override
+  String loginQuickBiometricReason(Object biometric) {
+    return 'Đăng nhập nhanh bằng $biometric vào HubSight';
+  }
+
+  @override
+  String get serverNotConfigured => 'Chưa cấu hình máy chủ';
+
+  @override
+  String get configureServerNow => 'Cấu hình máy chủ ngay';
+
+  @override
+  String get recoveryCodeHint => 'Nhập mã khôi phục 8-16 ký tự';
+
+  @override
+  String get useTotpCode => 'Sử dụng mã xác thực 6 số';
+
+  @override
+  String get backToLogin => 'Quay lại đăng nhập';
+
+  @override
+  String get onvifModeSystemCameras => 'Camera trong hệ thống';
+
+  @override
+  String get onvifModeCustomIp => 'Nhập IP tùy chỉnh';
+
+  @override
+  String get onvifHostHint => '192.168.1.100 hoặc hostname';
+
+  @override
+  String get onvifPasswordHint => 'Mật khẩu ONVIF (nếu có)';
+
+  @override
+  String get probingCamera => 'Đang dò tìm...';
+
+  @override
+  String get onvifPtzSupported => 'Hỗ trợ PTZ';
+
+  @override
+  String get onvifDeviceInfo => 'Thông tin thiết bị';
+
+  @override
+  String get onvifManufacturer => 'Nhà sản xuất';
+
+  @override
+  String get onvifModel => 'Mẫu mã (Model)';
+
+  @override
+  String get onvifFirmwareVersion => 'Phiên bản Firmware';
+
+  @override
+  String get onvifSerialNumber => 'Số Serial';
+
+  @override
+  String get onvifMediaProfiles => 'Cấu hình luồng (Media Profiles)';
+
+  @override
+  String get onvifNoProfiles => 'Chưa trích xuất được profile media.';
+
+  @override
+  String get onvifRtspCopied => 'Đã sao chép RTSP Stream URI!';
+
+  @override
+  String aiAlertNotification(Object camera, Object event) {
+    return 'Cảnh báo AI: $event tại camera $camera';
+  }
+
+  @override
+  String get allCameras => 'Tất cả';
+
+  @override
+  String get recentRecognitions => 'Nhật ký nhận diện gần đây';
+
+  @override
+  String eventsCount(Object count) {
+    return '$count sự kiện';
+  }
+
+  @override
+  String get noRecognitionData => 'Chưa có dữ liệu nhận diện khuôn mặt';
+
+  @override
+  String get stranger => 'Người lạ';
+
+  @override
+  String get noActiveStreamingCameras =>
+      'Không có camera nào đang hoạt động để phát trực tiếp';
+
+  @override
+  String get ptzPresetHint => 'e.g. Cổng chính, Cửa sổ, Sân sau';
+
+  @override
+  String ptzPresetSaved(Object name) {
+    return 'Đã lưu điểm nhớ: $name';
+  }
+
+  @override
+  String ptzPresetSaveFailed(Object error) {
+    return 'Không thể lưu điểm nhớ: $error';
+  }
+
+  @override
+  String get ptzDeletePresetTitle => 'Xóa điểm nhớ';
+
+  @override
+  String ptzDeletePresetConfirm(Object name) {
+    return 'Bạn có chắc chắn muốn xóa điểm nhớ \"$name\" không?';
+  }
+
+  @override
+  String ptzPresetDeleted(Object name) {
+    return 'Đã xóa điểm nhớ: $name';
+  }
+
+  @override
+  String ptzPresetDeleteFailed(Object error) {
+    return 'Lỗi xóa điểm nhớ: $error';
+  }
+
+  @override
+  String ptzCommandFailed(Object error) {
+    return 'Lệnh PTZ không thành công: $error';
+  }
+
+  @override
+  String get ptzHoldInstruction =>
+      'Nhấn giữ nút mũi tên để quay quét camera, thả tay để dừng.';
+
+  @override
+  String get ptzNoPresets => 'Chưa có điểm nhớ nào được lưu cho camera này.';
+
+  @override
+  String ptzMovingTo(Object name) {
+    return 'Đang xoay camera tới: $name';
+  }
+
+  @override
+  String ptzMoveFailed(Object error) {
+    return 'Lỗi chuyển vị trí: $error';
+  }
+
+  @override
+  String get webrtcErrBadGateway =>
+      'Máy chủ hoặc kết nối camera đang tạm thời gián đoạn (502 Bad Gateway). Đang thử lại...';
+
+  @override
+  String get webrtcErrNotFound =>
+      'Camera không tồn tại hoặc đã bị gỡ khỏi hệ thống.';
+
+  @override
+  String get webrtcErrUnauthorized =>
+      'Phiên đăng nhập đã hết hạn hoặc không có quyền xem camera này.';
+
+  @override
+  String get webrtcErrNetwork =>
+      'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
+
+  @override
+  String webrtcErrConnection(Object error) {
+    return 'Lỗi kết nối camera: $error';
+  }
+
+  @override
+  String webrtcReconnecting(Object count, Object max) {
+    return 'Đang tự động kết nối lại luồng video ($count/$max)...';
+  }
+
+  @override
+  String get webrtcErrSdkNotReady => 'SDK chưa được khởi tạo';
+
+  @override
+  String get webrtcErrStreamFailed => 'Không thể kết nối luồng trực tiếp.';
+
+  @override
+  String fallAlertWarning(Object count) {
+    return 'CẢNH BÁO: TÉ NGÃ ($count)';
+  }
+
+  @override
+  String get webrtcConnecting => 'Đang kết nối WebRTC (WHEP)...';
+
+  @override
+  String get webrtcStreamUnavailable => 'Luồng trực tiếp không khả dụng';
+
+  @override
+  String get retryButton => 'Thử lại';
+
+  @override
+  String get markAllRead => 'Đã đọc hết';
+
+  @override
+  String get noUnreadNotifications => 'Không có thông báo chưa đọc';
+
+  @override
+  String get noUnreadNotificationsDesc =>
+      'Bạn đã xem tất cả các cảnh báo an ninh';
+
+  @override
+  String get noNotificationsDesc =>
+      'Các cảnh báo an ninh và sự kiện AI sẽ hiển thị ở đây';
+
+  @override
+  String passkeyDefaultDeviceName(Object biometric) {
+    return '$biometric trên thiết bị này';
+  }
+
+  @override
+  String get securitySectionTitle => 'Bảo mật ứng dụng';
+
+  @override
+  String get noOtherSessions => 'Không có phiên nào khác đang hoạt động';
+
+  @override
+  String get thisDevice => 'Thiết bị này';
+
+  @override
+  String otherSessionsCount(Object count) {
+    return '$count phiên đăng nhập khác';
+  }
+
+  @override
+  String get tapToCollapse => 'Chạm để thu gọn';
+
+  @override
+  String get tapToManageAndRevoke => 'Chạm để quản lý và thu hồi';
+
+  @override
+  String get genericDevice => 'Thiết bị';
+
+  @override
+  String get changePinTitle => 'Đổi mã PIN bảo mật';
+
+  @override
+  String get changePinSubtitle => 'Thiết lập lại mã PIN 4 chữ số dự phòng';
+
+  @override
+  String get pinUpdatedSuccess => 'Đã cập nhật mã PIN mới thành công';
+
+  @override
+  String get notConfigured => 'Chưa cấu hình';
+
+  @override
+  String serverProfileActive(Object name) {
+    return 'Profile: $name • Đang hoạt động';
+  }
+
+  @override
+  String get gatewayNotConnected => 'Chưa kết nối cổng Gateway';
+
+  @override
+  String get confirmLogout =>
+      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?';
+
+  @override
+  String configPickFileError(Object error) {
+    return 'Không thể chọn tệp tin: $error';
+  }
+
+  @override
+  String configQrAnalyzeError(Object error) {
+    return 'Lỗi phân tích hình ảnh QR: $error';
+  }
+
+  @override
+  String get configNoDataFromServer =>
+      'Không có dữ liệu trả về từ máy chủ cấu hình.';
+
+  @override
+  String get configNoFileSelectedError =>
+      'Chưa có tệp tin cấu hình. Vui lòng quay lại bước trước.';
+
+  @override
+  String get configDecryptingSignature =>
+      'Đang giải mã và kiểm tra chữ ký số...';
+
+  @override
+  String get configSavingSystem => 'Đang lưu cấu hình hệ thống...';
+
+  @override
+  String get configSuccessLoginPrompt =>
+      'Cấu hình máy chủ thành công! Vui lòng đăng nhập.';
+
+  @override
+  String configSaveError(Object error) {
+    return 'Lỗi lưu cấu hình: $error';
+  }
+
+  @override
+  String get configStepWelcome => 'Thiết lập HubSight';
+
+  @override
+  String get configStepMethod => 'Phương thức kết nối';
+
+  @override
+  String get configStepPickFile => 'Chọn tệp cấu hình';
+
+  @override
+  String get configStepScanQr => 'Quét mã QR';
+
+  @override
+  String get configStepPin => 'Mã PIN bảo mật';
+
+  @override
+  String get configStepSummary => 'Xác nhận cấu hình';
+
+  @override
+  String get processing => 'Đang xử lý...';
+
+  @override
+  String get configWelcomeTitle => 'Chào mừng đến với HubSight';
+
+  @override
+  String get configWelcomeSubtitle =>
+      'Để kết nối ứng dụng với máy chủ giám sát của bạn, vui lòng nhập tệp cấu hình bảo mật (.hscfg) hoặc quét mã QR do quản trị viên cấp.';
+
+  @override
+  String get configFeatureE2eeTitle => 'Mã hoá đa tầng End-to-End';
+
+  @override
+  String get configFeatureE2eeDesc =>
+      'Bảo vệ bằng thuật toán Argon2id và mã hoá AES-256-GCM quân sự.';
+
+  @override
+  String get configFeatureEd25519Title => 'Xác thực chữ ký số Ed25519';
+
+  @override
+  String get configFeatureEd25519Desc =>
+      'Đảm bảo tệp tin nguyên bản, chống giả mạo hoặc can thiệp máy chủ.';
+
+  @override
+  String get configFeatureZeroConfigTitle => 'Zero-Config Setup';
+
+  @override
+  String get configFeatureZeroConfigDesc =>
+      'Tự động thiết lập Gateway, WebSocket Relay và WebRTC trong vài giây.';
+
+  @override
+  String get configStartSetup => 'Bắt đầu thiết lập';
+
+  @override
+  String get configSelectMethodTitle => 'Chọn phương thức kết nối';
+
+  @override
+  String get configSelectMethodDesc =>
+      'Lựa chọn cách thức thuận tiện nhất để nhập thông số kết nối vào ứng dụng:';
+
+  @override
+  String get configMethodQrTitle => 'Quét mã QR cấu hình';
+
+  @override
+  String get configMethodQrDesc =>
+      'Sử dụng camera thiết bị để quét mã QR cấu hình trực tiếp từ màn hình máy tính hoặc ảnh lưu trữ.';
+
+  @override
+  String get configMethodRecommended => 'Khuyên dùng';
+
+  @override
+  String get configMethodFileTitle => 'Chọn tệp cấu hình (.hscfg)';
+
+  @override
+  String get configMethodFileDesc =>
+      'Chọn tệp tin container bảo mật (.hscfg) đã được tải về trên thiết bị của bạn.';
+
+  @override
+  String get backButton => 'Quay lại';
+
+  @override
+  String get configPickFileTitle => 'Chọn tệp cấu hình (.hscfg)';
+
+  @override
+  String get configPickFileSubtitle =>
+      'Chọn tệp container an toàn được quản trị viên xuất từ hệ thống.';
+
+  @override
+  String get configTapToPickFile => 'Nhấn để chọn tệp .hscfg';
+
+  @override
+  String configFileSizeKb(Object size) {
+    return 'Dung lượng: $size KB';
+  }
+
+  @override
+  String get configStandardFormatSupport =>
+      'Hỗ trợ định dạng .hscfg tiêu chuẩn';
+
+  @override
+  String get configReadyToDecrypt => 'SẴN SÀNG GIẢI MÃ';
+
+  @override
+  String get configPickAnotherFile => 'Chọn tệp khác';
+
+  @override
+  String get configQrInstruction =>
+      'Hướng camera vào mã QR cấu hình để tự động nhận dạng';
+
+  @override
+  String get configFlashTooltip => 'Đèn flash';
+
+  @override
+  String get configQrPickGallery => 'Chọn ảnh QR từ thư viện';
+
+  @override
+  String get configSwitchCameraTooltip => 'Đổi camera';
+
+  @override
+  String get configQrFallbackName => 'Mã QR';
+
+  @override
+  String get configEnterPinTitle => 'Nhập mã PIN bảo mật (6 số)';
+
+  @override
+  String get configEnterPinSubtitle =>
+      'Nhập mã PIN 6 số do quản trị viên cấp để giải nén và giải mã container dữ liệu.';
+
+  @override
+  String get configDecryptButton => 'Giải nén & Giải mã';
+
+  @override
+  String get configDecryptionSuccess => 'Giải mã & Xác thực thành công';
+
+  @override
+  String get configSignatureValid =>
+      'Chữ ký số Ed25519 hợp lệ. Tệp tin nguyên bản.';
+
+  @override
+  String get configConfirmTitle => 'Xác nhận thông tin cấu hình';
+
+  @override
+  String get configConfirmSubtitle =>
+      'Kiểm tra kỹ các thông số kết nối trước khi lưu cấu hình và kích hoạt ứng dụng:';
+
+  @override
+  String get configSummarySystemName => 'Tên hệ thống';
+
+  @override
+  String get configSummaryConfigId => 'Mã cấu hình';
+
+  @override
+  String get configSummaryGateway => 'Máy chủ Gateway';
+
+  @override
+  String get configSummaryClientName => 'Tên máy khách';
+
+  @override
+  String get configSummaryCreatedBy => 'Tạo bởi';
+
+  @override
+  String get configSummaryCreatedAt => 'Thời gian tạo';
+
+  @override
+  String get none => 'Không có';
+
+  @override
+  String get configSummaryProfileVersion => 'Phiên bản hồ sơ';
+
+  @override
+  String get configConfirmAndProceed => 'Đồng ý & Chuyển sang Đăng nhập';
+
+  @override
+  String get configResetFromScratch => 'Thiết lập lại từ đầu';
+
+  @override
+  String get splashTagline => 'Giám sát & Quản trị Camera Thông minh';
+
+  @override
+  String get splashSubtitle => 'Nền tảng Camera An ninh & AI Doanh nghiệp';
+
+  @override
+  String get splashInitializing => 'Đang khởi tạo môi trường bảo mật...';
+
+  @override
+  String get liveTab => 'Trực tiếp';
+
+  @override
+  String get playbackTab => 'Xem lại';
+
+  @override
+  String get ptzControlPanel => 'Điều khiển PTZ';
+
+  @override
+  String get ptzSwipeHint => 'Vuốt trên video để xoay camera';
+
+  @override
+  String get ptzQuickAction => 'Điều khiển PTZ';
 }

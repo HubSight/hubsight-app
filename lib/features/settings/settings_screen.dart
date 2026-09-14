@@ -123,8 +123,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _handleOpenAddPasskey(AppLocalizations l10n) async {
     final bio = ref.read(biometricServiceProvider);
-    final bioLabel = await bio.getBiometricTypeLabel();
-    final defaultName = '$bioLabel trên thiết bị này';
+    final bioLabel = await bio.getLocalizedBiometricTypeLabel(l10n);
+    final defaultName = l10n.passkeyDefaultDeviceName(bioLabel);
     final nameController = TextEditingController(text: defaultName);
 
     if (!mounted) return;
@@ -649,7 +649,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 14),
 
             // 6. Security Settings (Lock & Password)
-            _buildSectionHeader('Bảo mật ứng dụng'),
+            _buildSectionHeader(l10n.securitySectionTitle),
             _buildSecuritySection(l10n),
             const SizedBox(height: 14),
 
@@ -1125,7 +1125,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Không có phiên nào khác đang hoạt động',
+                    l10n.noOtherSessions,
                     style: TextStyle(color: context.textMutedAdaptive, fontSize: 12),
                   ),
                 ),
@@ -1149,7 +1149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 : Icons.laptop_mac_rounded,
             const Color(0xFF10B981),
           ),
-          title: currentSession.deviceLabel ?? currentSession.clientType ?? 'Thiết bị này',
+          title: currentSession.deviceLabel ?? currentSession.clientType ?? l10n.thisDevice,
           subtitle: 'IP: ${currentSession.ipAddress ?? "LAN"} • ${currentSession.geoCity ?? "Local"}',
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -1187,7 +1187,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${otherSessions.length} phiên đăng nhập khác',
+                          l10n.otherSessionsCount(otherSessions.length),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -1196,7 +1196,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _isSessionsExpanded ? 'Chạm để thu gọn' : 'Chạm để quản lý và thu hồi',
+                          _isSessionsExpanded ? l10n.tapToCollapse : l10n.tapToManageAndRevoke,
                           style: TextStyle(fontSize: 11, color: context.textMutedAdaptive),
                         ),
                       ],
@@ -1225,7 +1225,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            s.deviceLabel ?? s.clientType ?? 'Thiết bị',
+                            s.deviceLabel ?? s.clientType ?? l10n.genericDevice,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1364,8 +1364,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (_lockOnBackground)
           _buildSettingTile(
             icon: _buildSettingIcon(Icons.pin_rounded, const Color(0xFF3B82F6)),
-            title: 'Đổi mã PIN bảo mật',
-            subtitle: 'Thiết lập lại mã PIN 4 chữ số dự phòng',
+            title: l10n.changePinTitle,
+            subtitle: l10n.changePinSubtitle,
             trailing: Icon(Icons.chevron_right_rounded, color: context.textMutedAdaptive, size: 20),
             onTap: () {
               Navigator.of(context).push(
@@ -1375,9 +1375,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onUnlocked: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đã cập nhật mã PIN mới thành công'),
-                          backgroundColor: Color(0xFF10B981),
+                        SnackBar(
+                          content: Text(l10n.pinUpdatedSuccess),
+                          backgroundColor: const Color(0xFF10B981),
                         ),
                       );
                     },
@@ -1535,10 +1535,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       children: [
         _buildSettingTile(
           icon: _buildSettingIcon(Icons.dns_rounded, const Color(0xFF0EA5E9)),
-          title: sdk?.config.urls.gatewayUrl ?? 'Chưa cấu hình',
+          title: sdk?.config.urls.gatewayUrl ?? l10n.notConfigured,
           subtitle: sdk != null
-              ? 'Profile: ${sdk.config.metadata.name} • Đang hoạt động'
-              : 'Chưa kết nối cổng Gateway',
+              ? l10n.serverProfileActive(sdk.config.metadata.name)
+              : l10n.gatewayNotConnected,
           trailing: InkWell(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -1687,7 +1687,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
         content: Text(
-          'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?',
+          l10n.confirmLogout,
           style: TextStyle(fontSize: 13.5, color: context.textSecondaryAdaptive),
         ),
         actions: [

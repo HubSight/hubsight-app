@@ -33,10 +33,15 @@ class ServerConfigScreen extends ConsumerStatefulWidget {
   final bool isInitialSetup;
   final ConfigWizardStep initialStep;
 
+  final Uint8List? initialConfigBytes;
+  final String? initialConfigFileName;
+
   const ServerConfigScreen({
     super.key,
     this.isInitialSetup = true,
     this.initialStep = ConfigWizardStep.welcome,
+    this.initialConfigBytes,
+    this.initialConfigFileName,
   });
 
   @override
@@ -72,6 +77,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   void initState() {
     super.initState();
     _currentStep = widget.initialStep;
+    _configBytes = widget.initialConfigBytes;
+    _configFileName = widget.initialConfigFileName;
+    _configFileSize = widget.initialConfigBytes?.length;
     _pinController.addListener(_updatePinState);
     _scannerController = MobileScannerController(
       formats: const [BarcodeFormat.qrCode],
@@ -171,7 +179,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   // Step 3a: Pick File Handler
   // ===========================================================================
 
-  Future<void> _handlePickFile() async {
+  Future<void> _handlePickFile([AppLocalizations? l10n]) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
@@ -180,17 +188,27 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        if (file.bytes != null) {
+        Uint8List? bytes = file.bytes;
+        if (bytes == null && file.path != null) {
+          try {
+            bytes = await File(file.path!).readAsBytes();
+          } catch (_) {}
+        }
+        if (bytes != null) {
+          final loadedBytes = bytes;
           setState(() {
-            _configBytes = file.bytes;
+            _configBytes = loadedBytes;
             _configFileName = file.name;
-            _configFileSize = file.size;
+            _configFileSize = loadedBytes.length;
             _errorMessage = null;
           });
         }
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Không thể chọn tệp tin: $e');
+      if (mounted) {
+        final loc = l10n ?? AppLocalizations.of(context);
+        setState(() => _errorMessage = loc != null ? loc.configPickFileError(e.toString()) : 'Cannot select file: $e');
+      }
     }
   }
 
@@ -221,7 +239,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
         }
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Lỗi phân tích hình ảnh QR: $e');
+      setState(() => _errorMessage = l10n.configQrAnalyzeError(e.toString()));
     }
   }
 
@@ -255,7 +273,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       );
 
       if (response.data == null || response.data!.isEmpty) {
-        throw Exception('Không có dữ liệu trả về từ máy chủ cấu hình.');
+        throw Exception(l10n.configNoDataFromServer);
       }
 
       final downloadedBytes = Uint8List.fromList(response.data!);
@@ -310,7 +328,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   Future<void> _handleDecrypt(AppLocalizations l10n) async {
     final pin = _pinController.text.trim();
     if (_configBytes == null) {
-      setState(() => _errorMessage = 'Chưa có tệp tin cấu hình. Vui lòng quay lại bước trước.');
+      setState(() => _errorMessage = l10n.configNoFileSelectedError);
       return;
     }
     if (pin.length != 6 || int.tryParse(pin) == null) {
@@ -320,7 +338,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Đang giải mã và kiểm tra chữ ký số...';
+      _loadingMessage = l10n.configDecryptingSignature;
       _errorMessage = null;
     });
 
@@ -357,12 +375,12 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   // Step 5: Save Config & Navigate to Login Handler
   // ===========================================================================
 
-  Future<void> _handleConfirmAndSave() async {
+  Future<void> _handleConfirmAndSave(AppLocalizations l10n) async {
     if (_decryptedConfig == null) return;
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Đang lưu cấu hình hệ thống...';
+      _loadingMessage = l10n.configSavingSystem;
     });
 
     try {
@@ -371,10 +389,10 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cấu hình máy chủ thành công! Vui lòng đăng nhập.'),
-            backgroundColor: Color(0xFF10B981),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(l10n.configSuccessLoginPrompt),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 3),
           ),
         );
 
@@ -388,7 +406,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
         setState(() {
           _isLoading = false;
           _loadingMessage = '';
-          _errorMessage = 'Lỗi lưu cấu hình: $e';
+          _errorMessage = l10n.configSaveError(e.toString());
         });
       }
     }
@@ -402,50 +420,53 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF07090E),
-      appBar: _buildWizardAppBar(l10n),
-      body: Stack(
-        children: [
-          // Ambient Cyber Radial Glow at the top
-          Positioned(
-            top: -120,
-            left: -60,
-            right: -60,
-            height: 380,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topCenter,
-                  radius: 1.1,
-                  colors: [
-                    HubSightColors.primary.withValues(alpha: 0.18),
-                    const Color(0x28431407),
-                    Colors.transparent,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+    return Theme(
+      data: AppTheme.darkTheme,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF07090E),
+        appBar: _buildWizardAppBar(l10n),
+        body: Stack(
+          children: [
+            // Ambient Cyber Radial Glow at the top
+            Positioned(
+              top: -120,
+              left: -60,
+              right: -60,
+              height: 380,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topCenter,
+                    radius: 1.1,
+                    colors: [
+                      HubSightColors.primary.withValues(alpha: 0.18),
+                      const Color(0x28431407),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Main Content Area
-          SafeArea(
-            child: Column(
-              children: [
-                // Step Progress Indicator (visible on steps 2, 3, 4, 5)
-                if (_currentStep != ConfigWizardStep.welcome) _buildStepProgress(),
+            // Main Content Area
+            SafeArea(
+              child: Column(
+                children: [
+                  // Step Progress Indicator (visible on steps 2, 3, 4, 5)
+                  if (_currentStep != ConfigWizardStep.welcome) _buildStepProgress(),
 
-                // Active Step Content
-                Expanded(
-                  child: _isLoading && _currentStep != ConfigWizardStep.scanQr
-                      ? _buildLoadingState()
-                      : _buildActiveStepView(l10n),
-                ),
-              ],
+                  // Active Step Content
+                  Expanded(
+                    child: _isLoading && _currentStep != ConfigWizardStep.scanQr
+                        ? _buildLoadingState(l10n)
+                        : _buildActiveStepView(l10n),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -512,17 +533,17 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   String _getStepTitle(AppLocalizations l10n) {
     switch (_currentStep) {
       case ConfigWizardStep.welcome:
-        return 'Thiết lập HubSight';
+        return l10n.configStepWelcome;
       case ConfigWizardStep.selectMethod:
-        return 'Phương thức kết nối';
+        return l10n.configStepMethod;
       case ConfigWizardStep.pickFile:
-        return 'Chọn tệp cấu hình';
+        return l10n.configStepPickFile;
       case ConfigWizardStep.scanQr:
-        return 'Quét mã QR';
+        return l10n.configStepScanQr;
       case ConfigWizardStep.enterPin:
-        return 'Mã PIN bảo mật';
+        return l10n.configStepPin;
       case ConfigWizardStep.summary:
-        return 'Xác nhận cấu hình';
+        return l10n.configStepSummary;
     }
   }
 
@@ -649,7 +670,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     }
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildLoadingState(AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -680,7 +701,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              _loadingMessage.isNotEmpty ? _loadingMessage : 'Đang xử lý...',
+              _loadingMessage.isNotEmpty ? _loadingMessage : l10n.processing,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -794,9 +815,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 16),
 
-          const Text(
-            'Chào mừng đến với HubSight',
-            style: TextStyle(
+          Text(
+            l10n.configWelcomeTitle,
+            style: const TextStyle(
               fontSize: 23,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -807,7 +828,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           const SizedBox(height: 10),
 
           Text(
-            'Để kết nối ứng dụng với máy chủ giám sát của bạn, vui lòng nhập tệp cấu hình bảo mật (.hscfg) hoặc quét mã QR do quản trị viên cấp.',
+            l10n.configWelcomeSubtitle,
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withValues(alpha: 0.65),
@@ -820,20 +841,20 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           // Security Highlights Modules
           _buildFeatureItem(
             icon: Icons.lock_outline_rounded,
-            title: 'Mã hoá đa tầng End-to-End',
-            subtitle: 'Bảo vệ bằng thuật toán Argon2id và mã hoá AES-256-GCM quân sự.',
+            title: l10n.configFeatureE2eeTitle,
+            subtitle: l10n.configFeatureE2eeDesc,
           ),
           const SizedBox(height: 14),
           _buildFeatureItem(
             icon: Icons.verified_user_outlined,
-            title: 'Xác thực chữ ký số Ed25519',
-            subtitle: 'Đảm bảo tệp tin nguyên bản, chống giả mạo hoặc can thiệp máy chủ.',
+            title: l10n.configFeatureEd25519Title,
+            subtitle: l10n.configFeatureEd25519Desc,
           ),
           const SizedBox(height: 14),
           _buildFeatureItem(
             icon: Icons.bolt_rounded,
-            title: 'Zero-Config Setup',
-            subtitle: 'Tự động thiết lập Gateway, WebSocket Relay và WebRTC trong vài giây.',
+            title: l10n.configFeatureZeroConfigTitle,
+            subtitle: l10n.configFeatureZeroConfigDesc,
           ),
 
           const SizedBox(height: 36),
@@ -863,15 +884,15 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Bắt đầu thiết lập',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                    l10n.configStartSetup,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded, size: 18),
                 ],
               ),
             ),
@@ -976,9 +997,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Chọn phương thức kết nối',
-            style: TextStyle(
+          Text(
+            l10n.configSelectMethodTitle,
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -987,7 +1008,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Lựa chọn cách thức thuận tiện nhất để nhập thông số kết nối vào ứng dụng:',
+            l10n.configSelectMethodDesc,
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withValues(alpha: 0.65),
@@ -999,9 +1020,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           // Option 1: QR Scanner
           _buildMethodCard(
             icon: Icons.qr_code_scanner_rounded,
-            title: 'Quét mã QR cấu hình',
-            subtitle: 'Sử dụng camera thiết bị để quét mã QR cấu hình trực tiếp từ màn hình máy tính hoặc ảnh lưu trữ.',
-            badge: 'Khuyên dùng',
+            title: l10n.configMethodQrTitle,
+            subtitle: l10n.configMethodQrDesc,
+            badge: l10n.configMethodRecommended,
             onTap: () {
               setState(() => _selectedMethod = ConfigMethod.qr);
               _goToStep(ConfigWizardStep.scanQr);
@@ -1012,8 +1033,8 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           // Option 2: Import File
           _buildMethodCard(
             icon: Icons.file_present_rounded,
-            title: 'Chọn tệp cấu hình (.hscfg)',
-            subtitle: 'Chọn tệp tin container bảo mật (.hscfg) đã được tải về trên thiết bị của bạn.',
+            title: l10n.configMethodFileTitle,
+            subtitle: l10n.configMethodFileDesc,
             badge: null,
             onTap: () {
               setState(() => _selectedMethod = ConfigMethod.file);
@@ -1034,9 +1055,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                 backgroundColor: Colors.white.withValues(alpha: 0.04),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text(
-                'Quay lại',
-                style: TextStyle(
+              child: Text(
+                l10n.backButton,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1153,9 +1174,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Chọn tệp cấu hình (.hscfg)',
-            style: TextStyle(
+          Text(
+            l10n.configPickFileTitle,
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -1164,7 +1185,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Chọn tệp container an toàn được quản trị viên xuất từ hệ thống.',
+            l10n.configPickFileSubtitle,
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withValues(alpha: 0.65),
@@ -1175,7 +1196,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
 
           // File Picker Dropzone Card (Cyber Radar Style)
           InkWell(
-            onTap: _handlePickFile,
+            onTap: () => _handlePickFile(l10n),
             borderRadius: BorderRadius.circular(20),
             child: Container(
               width: double.infinity,
@@ -1234,7 +1255,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    _configFileName ?? 'Nhấn để chọn tệp .hscfg',
+                    _configFileName ?? l10n.configTapToPickFile,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1245,8 +1266,8 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _configBytes != null
-                        ? 'Dung lượng: ${((_configFileSize ?? 0) / 1024).toStringAsFixed(1)} KB'
-                        : 'Hỗ trợ định dạng .hscfg tiêu chuẩn',
+                        ? l10n.configFileSizeKb(((_configFileSize ?? 0) / 1024).toStringAsFixed(1))
+                        : l10n.configStandardFormatSupport,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.white.withValues(alpha: 0.55),
@@ -1261,14 +1282,14 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_rounded, color: Color(0xFF34D399), size: 14),
-                          SizedBox(width: 6),
+                          const Icon(Icons.check_rounded, color: Color(0xFF34D399), size: 14),
+                          const SizedBox(width: 6),
                           Text(
-                            'SẴN SÀNG GIẢI MÃ',
-                            style: TextStyle(
+                            l10n.configReadyToDecrypt,
+                            style: const TextStyle(
                               color: Color(0xFF34D399),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -1281,11 +1302,15 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
-                      onPressed: _handlePickFile,
+                      onPressed: () => _handlePickFile(l10n),
                       icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('Chọn tệp khác', style: TextStyle(fontSize: 12.5)),
+                      label: Text(
+                        l10n.configPickAnotherFile,
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
                         side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1317,9 +1342,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       backgroundColor: Colors.white.withValues(alpha: 0.04),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text(
-                      'Quay lại',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.backButton,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1358,14 +1383,14 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       disabledForegroundColor: Colors.white.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const FittedBox(
+                    child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Tiếp tục', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          SizedBox(width: 6),
-                          Icon(Icons.arrow_forward_rounded, size: 18),
+                          Text(l10n.continueButton, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.arrow_forward_rounded, size: 18),
                         ],
                       ),
                     ),
@@ -1445,10 +1470,10 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Hướng camera vào mã QR cấu hình để tự động nhận dạng',
-                          style: TextStyle(
+                          l10n.configQrInstruction,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
@@ -1503,7 +1528,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.flash_on_rounded),
-                    tooltip: 'Đèn flash',
+                    tooltip: l10n.configFlashTooltip,
                     color: Colors.white.withValues(alpha: 0.8),
                     onPressed: () => _scannerController.toggleTorch(),
                   ),
@@ -1511,9 +1536,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _handlePickQrImage(l10n),
                       icon: const Icon(Icons.photo_library_outlined, size: 18),
-                      label: const Text(
-                        'Chọn ảnh QR từ thư viện',
-                        style: TextStyle(fontSize: 13),
+                      label: Text(
+                        l10n.configQrPickGallery,
+                        style: const TextStyle(fontSize: 13),
                         overflow: TextOverflow.ellipsis,
                       ),
                       style: OutlinedButton.styleFrom(
@@ -1527,7 +1552,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.flip_camera_ios_rounded),
-                    tooltip: 'Đổi camera',
+                    tooltip: l10n.configSwitchCameraTooltip,
                     color: Colors.white.withValues(alpha: 0.8),
                     onPressed: () => _scannerController.switchCamera(),
                   ),
@@ -1547,7 +1572,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   Widget _buildStep4EnterPin(AppLocalizations l10n) {
     final sourceLabel = _selectedMethod == ConfigMethod.file
         ? 'FILE // ${_configFileName ?? "hubsight.hscfg"}'
-        : 'QR PAYLOAD // ${_qrPayload?.name.isNotEmpty == true ? _qrPayload!.name : (_qrPayload?.configId ?? "Mã QR")}';
+        : 'QR PAYLOAD // ${_qrPayload?.name.isNotEmpty == true ? _qrPayload!.name : (_qrPayload?.configId ?? l10n.configQrFallbackName)}';
 
     final pinText = _pinController.text;
 
@@ -1556,9 +1581,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Nhập mã PIN bảo mật (6 số)',
-            style: TextStyle(
+          Text(
+            l10n.configEnterPinTitle,
+            style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -1567,7 +1592,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Nhập mã PIN 6 số do quản trị viên cấp để giải nén và giải mã container dữ liệu.',
+            l10n.configEnterPinSubtitle,
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withValues(alpha: 0.65),
@@ -1659,9 +1684,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       backgroundColor: Colors.white.withValues(alpha: 0.04),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text(
-                      'Quay lại',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.backButton,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1693,16 +1718,16 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const FittedBox(
+                    child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.lock_open_rounded, size: 18),
-                          SizedBox(width: 8),
+                          const Icon(Icons.lock_open_rounded, size: 18),
+                          const SizedBox(width: 8),
                           Text(
-                            'Giải nén & Giải mã',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            l10n.configDecryptButton,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                         ],
                       ),
@@ -1811,15 +1836,15 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.verified_rounded, color: Color(0xFF34D399), size: 28),
-                SizedBox(width: 14),
+                const Icon(Icons.verified_rounded, color: Color(0xFF34D399), size: 28),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'CRYPTOGRAPHIC INTEGRITY: VERIFIED',
                         style: TextStyle(
                           fontSize: 11,
@@ -1829,19 +1854,19 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                           letterSpacing: 1.0,
                         ),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
-                        'Giải mã & Xác thực thành công',
-                        style: TextStyle(
+                        l10n.configDecryptionSuccess,
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        'Chữ ký số Ed25519 hợp lệ. Tệp tin nguyên bản.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF34D399)),
+                        l10n.configSignatureValid,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF34D399)),
                       ),
                     ],
                   ),
@@ -1851,9 +1876,9 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 24),
 
-          const Text(
-            'Xác nhận thông tin cấu hình',
-            style: TextStyle(
+          Text(
+            l10n.configConfirmTitle,
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               color: Colors.white,
@@ -1862,7 +1887,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Kiểm tra kỹ các thông số kết nối trước khi lưu cấu hình và kích hoạt ứng dụng:',
+            l10n.configConfirmSubtitle,
             style: TextStyle(
               fontSize: 13.5,
               color: Colors.white.withValues(alpha: 0.65),
@@ -1889,15 +1914,15 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
               borderRadius: BorderRadius.circular(16),
               child: Column(
                 children: [
-                  _buildSummaryRow('Tên hệ thống', cfg.metadata.name.isNotEmpty ? cfg.metadata.name : 'HubSight CCTV'),
-                  _buildSummaryRow('Mã cấu hình', cfg.metadata.configId),
-                  _buildSummaryRow('Máy chủ Gateway', cfg.urls.gatewayUrl),
+                  _buildSummaryRow(l10n.configSummarySystemName, cfg.metadata.name.isNotEmpty ? cfg.metadata.name : 'HubSight CCTV'),
+                  _buildSummaryRow(l10n.configSummaryConfigId, cfg.metadata.configId),
+                  _buildSummaryRow(l10n.configSummaryGateway, cfg.urls.gatewayUrl),
                   _buildSummaryRow('API Base URL', cfg.urls.apiBaseUrl),
                   _buildSummaryRow('Relay WebSocket', cfg.urls.relayWsUrl),
-                  _buildSummaryRow('Tên máy khách', cfg.key.clientName),
-                  _buildSummaryRow('Tạo bởi', cfg.metadata.createdBy),
-                  _buildSummaryRow('Thời gian tạo', cfg.metadata.createdAtUtc ?? 'Không có'),
-                  _buildSummaryRow('Phiên bản hồ sơ', cfg.metadata.formatVersion, isLast: true),
+                  _buildSummaryRow(l10n.configSummaryClientName, cfg.key.clientName),
+                  _buildSummaryRow(l10n.configSummaryCreatedBy, cfg.metadata.createdBy),
+                  _buildSummaryRow(l10n.configSummaryCreatedAt, cfg.metadata.createdAtUtc ?? l10n.none),
+                  _buildSummaryRow(l10n.configSummaryProfileVersion, cfg.metadata.formatVersion, isLast: true),
                 ],
               ),
             ),
@@ -1926,23 +1951,23 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
               ],
             ),
             child: ElevatedButton(
-              onPressed: _handleConfirmAndSave,
+              onPressed: () => _handleConfirmAndSave(l10n),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const FittedBox(
+              child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded, size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.check_circle_outline_rounded, size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      'Đồng ý & Chuyển sang Đăng nhập',
-                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                      l10n.configConfirmAndProceed,
+                      style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1960,7 +1985,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white.withValues(alpha: 0.6),
               ),
-              child: const Text('Thiết lập lại từ đầu'),
+              child: Text(l10n.configResetFromScratch),
             ),
           ),
         ],

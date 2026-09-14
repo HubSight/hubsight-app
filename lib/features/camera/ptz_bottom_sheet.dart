@@ -94,7 +94,7 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
               autofocus: true,
               style: TextStyle(color: context.textPrimaryAdaptive),
               decoration: InputDecoration(
-                hintText: 'e.g. Cổng chính, Cửa sổ, Sân sau',
+                hintText: l10n.ptzPresetHint,
                 hintStyle: TextStyle(color: context.textMutedAdaptive),
                 filled: true,
                 fillColor: context.surfaceAdaptive,
@@ -138,14 +138,14 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
         if (mounted) {
           setState(() {
             _presets.add(newPreset);
-            _statusMessage = 'Đã lưu điểm nhớ: $result';
+            _statusMessage = l10n.ptzPresetSaved(result);
             _isSuccessMessage = true;
           });
         }
       } catch (e) {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Không thể lưu điểm nhớ: $e';
+            _statusMessage = l10n.ptzPresetSaveFailed(e.toString());
             _isSuccessMessage = false;
           });
         }
@@ -156,6 +156,7 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
   Future<void> _handleDeletePreset(PresetItem preset) async {
     final sdk = ref.read(hubsightSdkProvider);
     if (sdk == null) return;
+    final l10n = AppLocalizations.of(context)!;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -163,22 +164,22 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
         backgroundColor: context.cardAdaptive,
         shape: RoundedRectangleBorder(borderRadius: HubSightRadius.roundedXl),
         title: Text(
-          'Xóa điểm nhớ',
+          l10n.ptzDeletePresetTitle,
           style: TextStyle(color: context.textPrimaryAdaptive, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Bạn có chắc chắn muốn xóa điểm nhớ "${preset.name}" không?',
+          l10n.ptzDeletePresetConfirm(preset.name),
           style: TextStyle(color: context.textSecondaryAdaptive),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Hủy'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: HubSightColors.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+            child: Text(l10n.confirmDelete, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -190,14 +191,14 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
         if (mounted) {
           setState(() {
             _presets.removeWhere((p) => p.token == preset.token);
-            _statusMessage = 'Đã xóa điểm nhớ: ${preset.name}';
+            _statusMessage = l10n.ptzPresetDeleted(preset.name);
             _isSuccessMessage = true;
           });
         }
       } catch (e) {
         if (mounted) {
           setState(() {
-            _statusMessage = 'Lỗi xóa điểm nhớ: $e';
+            _statusMessage = l10n.ptzPresetDeleteFailed(e.toString());
             _isSuccessMessage = false;
           });
         }
@@ -375,7 +376,7 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
                   onError: (e) {
                     if (mounted) {
                       setState(() {
-                        _statusMessage = 'Lệnh PTZ không thành công: $e';
+                        _statusMessage = l10n.ptzCommandFailed(e.toString());
                         _isSuccessMessage = false;
                       });
                     }
@@ -385,7 +386,7 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
 
               const SizedBox(height: 12),
               Text(
-                'Nhấn giữ nút mũi tên để quay quét camera, thả tay để dừng.',
+                l10n.ptzHoldInstruction,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11.5,
@@ -468,7 +469,7 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,
                   child: Text(
-                    'Chưa có điểm nhớ nào được lưu cho camera này.',
+                    l10n.ptzNoPresets,
                     style: TextStyle(fontSize: 12, color: context.textMutedAdaptive),
                   ),
                 ),
@@ -488,14 +489,14 @@ class _PtzBottomSheetState extends ConsumerState<PtzBottomSheet> {
                             await sdk?.cameras.gotoPreset(widget.camera.id, preset.token);
                             if (mounted) {
                               setState(() {
-                                _statusMessage = 'Đang xoay camera tới: ${preset.name}';
+                                _statusMessage = l10n.ptzMovingTo(preset.name);
                                 _isSuccessMessage = true;
                               });
                             }
                           } catch (e) {
                             if (mounted) {
                               setState(() {
-                                _statusMessage = 'Lỗi chuyển vị trí: $e';
+                                _statusMessage = l10n.ptzMoveFailed(e.toString());
                                 _isSuccessMessage = false;
                               });
                             }

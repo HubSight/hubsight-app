@@ -330,7 +330,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
           if (unreadCount > 0)
             IconButton(
               icon: const Icon(Icons.done_all_rounded, color: Colors.white, size: 22),
-              tooltip: 'Đã đọc hết',
+              tooltip: l10n.markAllRead,
               onPressed: () {
                 HapticFeedback.lightImpact();
                 _handleMarkAllRead();
@@ -441,7 +441,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              _filter == 'unread' ? 'Không có thông báo chưa đọc' : l10n.noNotifications,
+              _filter == 'unread' ? l10n.noUnreadNotifications : l10n.noNotifications,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -451,8 +451,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             const SizedBox(height: 6),
             Text(
               _filter == 'unread'
-                  ? 'Bạn đã xem tất cả các cảnh báo an ninh'
-                  : 'Các cảnh báo an ninh và sự kiện AI sẽ hiển thị ở đây',
+                  ? l10n.noUnreadNotificationsDesc
+                  : l10n.noNotificationsDesc,
               style: TextStyle(
                 fontSize: 12.5,
                 color: context.textMutedAdaptive,

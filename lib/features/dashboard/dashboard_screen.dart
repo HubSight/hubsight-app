@@ -5,6 +5,7 @@ import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
+import '../camera/ptz_bottom_sheet.dart';
 import '../common/main_tab_screen.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -81,6 +82,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _aiAlertSub = sdk.relay.onAIAlert.listen((event) {
       if (!mounted) return;
       if (event.eventType != 'fall' && event.eventType != 'danger') return;
+      final l10n = mounted ? AppLocalizations.of(context) : null;
+      final alertText = l10n?.aiAlertNotification(event.eventType, event.cameraId) ??
+          'Cảnh báo AI: ${event.eventType} tại camera ${event.cameraId}';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -88,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const Icon(Icons.warning_amber_rounded, color: Colors.white),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Cảnh báo AI: ${event.eventType} tại camera ${event.cameraId}'),
+                child: Text(alertText),
               ),
             ],
           ),
@@ -213,12 +217,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildMultiViewGrid(HubSightSDK sdk) {
+    final l10n = AppLocalizations.of(context)!;
     final activeCameraIds = _cameras.where((c) => c.isStreaming).map((c) => c.id).toList();
 
     if (activeCameraIds.isEmpty) {
       return Center(
         child: Text(
-          'Không có camera nào đang hoạt động để phát trực tiếp',
+          l10n.noActiveStreamingCameras,
           style: TextStyle(color: context.textMutedAdaptive),
         ),
       );
@@ -325,6 +330,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ],
                       ),
                     ),
+                    if (cam.onvifPtzSupported) ...[
+                      InkWell(
+                        key: Key('dashboard-ptz-${cam.id}'),
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          PtzBottomSheet.show(context, camera: cam);
+                        },
+                        borderRadius: HubSightRadius.roundedXl,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                            borderRadius: HubSightRadius.roundedXl,
+                            border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.control_camera_rounded, size: 13, color: Color(0xFF3B82F6)),
+                              SizedBox(width: 4),
+                              Text(
+                                'PTZ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(

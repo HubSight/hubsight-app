@@ -210,7 +210,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                     children: [
                       Expanded(
                         child: ChoiceChip(
-                          label: const Text('Camera trong hệ thống', style: TextStyle(fontSize: 12)),
+                          label: Text(l10n.onvifModeSystemCameras, style: const TextStyle(fontSize: 12)),
                           selected: !_isCustomMode,
                           onSelected: (val) {
                             if (val) {
@@ -227,7 +227,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ChoiceChip(
-                          label: const Text('Nhập IP tùy chỉnh', style: TextStyle(fontSize: 12)),
+                          label: Text(l10n.onvifModeCustomIp, style: const TextStyle(fontSize: 12)),
                           selected: _isCustomMode,
                           onSelected: (val) {
                             if (val) {
@@ -246,7 +246,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                   DropdownButtonFormField<Camera>(
                     initialValue: _selectedCamera,
                     decoration: InputDecoration(
-                      labelText: 'Chọn camera',
+                      labelText: l10n.selectCamera,
                       filled: true,
                       fillColor: context.surfaceAdaptive,
                       border: OutlineInputBorder(
@@ -279,7 +279,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                     controller: _hostController,
                     decoration: InputDecoration(
                       labelText: l10n.probeHost,
-                      hintText: '192.168.1.100 hoặc hostname',
+                      hintText: l10n.onvifHostHint,
                       filled: true,
                       fillColor: context.surfaceAdaptive,
                       border: OutlineInputBorder(
@@ -341,7 +341,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                   obscureText: true,
                   decoration: InputDecoration(
                     labelText: l10n.probePassword,
-                    hintText: 'Mật khẩu ONVIF (nếu có)',
+                    hintText: l10n.onvifPasswordHint,
                     filled: true,
                     fillColor: context.surfaceAdaptive,
                     border: OutlineInputBorder(
@@ -371,7 +371,7 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                         )
                       : const Icon(Icons.search_rounded, size: 20),
                   label: Text(
-                    _isProbing ? 'Đang dò tìm...' : l10n.probeCamera,
+                    _isProbing ? l10n.probingCamera : l10n.probeCamera,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                 ),
@@ -454,14 +454,14 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.control_camera_rounded, size: 12, color: Color(0xFF3B82F6)),
-                      SizedBox(width: 4),
+                      const Icon(Icons.control_camera_rounded, size: 12, color: Color(0xFF3B82F6)),
+                      const SizedBox(width: 4),
                       Text(
-                        'Hỗ trợ PTZ',
-                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6)),
+                        l10n.onvifPtzSupported,
+                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6)),
                       ),
                     ],
                   ),
@@ -475,15 +475,15 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
 
           // Hardware Info
           Text(
-            'Thông tin thiết bị',
+            l10n.onvifDeviceInfo,
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
           ),
           const SizedBox(height: 6),
-          _buildInfoRow('Nhà sản xuất', res.deviceInfo.manufacturer.isNotEmpty ? res.deviceInfo.manufacturer : 'ONVIF Standard'),
-          _buildInfoRow('Mẫu mã (Model)', res.deviceInfo.model.isNotEmpty ? res.deviceInfo.model : 'IP Camera'),
-          _buildInfoRow('Phiên bản Firmware', res.deviceInfo.firmwareVersion.isNotEmpty ? res.deviceInfo.firmwareVersion : 'N/A'),
+          _buildInfoRow(l10n.onvifManufacturer, res.deviceInfo.manufacturer.isNotEmpty ? res.deviceInfo.manufacturer : 'ONVIF Standard'),
+          _buildInfoRow(l10n.onvifModel, res.deviceInfo.model.isNotEmpty ? res.deviceInfo.model : 'IP Camera'),
+          _buildInfoRow(l10n.onvifFirmwareVersion, res.deviceInfo.firmwareVersion.isNotEmpty ? res.deviceInfo.firmwareVersion : 'N/A'),
           if (res.deviceInfo.serialNumber.isNotEmpty)
-            _buildInfoRow('Số Serial', res.deviceInfo.serialNumber),
+            _buildInfoRow(l10n.onvifSerialNumber, res.deviceInfo.serialNumber),
 
           const SizedBox(height: 12),
           Divider(height: 1, color: context.borderAdaptive),
@@ -491,12 +491,12 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
 
           // Stream Profiles
           Text(
-            'Cấu hình luồng (Media Profiles)',
+            l10n.onvifMediaProfiles,
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimaryAdaptive),
           ),
           const SizedBox(height: 6),
           if (res.profiles.isEmpty) ...[
-            Text('Chưa trích xuất được profile media.', style: TextStyle(fontSize: 11.5, color: context.textMutedAdaptive)),
+            Text(l10n.onvifNoProfiles, style: TextStyle(fontSize: 11.5, color: context.textMutedAdaptive)),
           ] else ...[
             ...res.profiles.map((p) {
               return Container(
@@ -549,9 +549,9 @@ class _OnvifDiscoverySheetState extends ConsumerState<OnvifDiscoverySheet> {
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: p.streamUri!));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Đã sao chép RTSP Stream URI!'),
-                                  duration: Duration(seconds: 1),
+                                SnackBar(
+                                  content: Text(l10n.onvifRtspCopied),
+                                  duration: const Duration(seconds: 1),
                                 ),
                               );
                             },

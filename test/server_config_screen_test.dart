@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:hubsight_app/core/theme/app_theme.dart';
 import 'package:hubsight_app/features/config/server_config_screen.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +99,50 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Chưa có tệp tin cấu hình. Vui lòng quay lại bước trước.'), findsOneWidget);
+    });
+
+    testWidgets('renders Step 3a with imported file and styled "Chọn tệp khác" button under Light and Dark mode', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.light,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('vi'),
+            home: ServerConfigScreen(
+              isInitialSetup: true,
+              initialStep: ConfigWizardStep.pickFile,
+              initialConfigBytes: Uint8List.fromList([1, 2, 3, 4, 5]),
+              initialConfigFileName: 'cctv.quoctran.space.hscfg',
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chọn tệp cấu hình (.hscfg)'), findsOneWidget);
+      expect(find.text('cctv.quoctran.space.hscfg'), findsOneWidget);
+      expect(find.text('SẴN SÀNG GIẢI MÃ'), findsOneWidget);
+      expect(find.text('Chọn tệp khác'), findsOneWidget);
+
+      final outlinedButtonFinder = find.widgetWithText(OutlinedButton, 'Chọn tệp khác');
+      expect(outlinedButtonFinder, findsOneWidget);
+
+      final buttonWidget = tester.widget<OutlinedButton>(outlinedButtonFinder);
+      final style = buttonWidget.style;
+      expect(style, isNotNull);
+      expect(style?.foregroundColor?.resolve({}), Colors.white);
+      expect(style?.backgroundColor?.resolve({}), Colors.white.withValues(alpha: 0.08));
     });
   });
 }

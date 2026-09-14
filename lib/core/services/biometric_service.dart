@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../storage/storage_service.dart';
@@ -46,11 +47,11 @@ class BiometricService {
   /// Check if hardware supports biometrics and device has enrolled biometrics
   Future<bool> canAuthenticateWithBiometrics() async {
     try {
-      final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
-      if (!canCheck && !isSupported) return false;
+      final canCheck = await _auth.canCheckBiometrics;
+      if (!isSupported && !canCheck) return false;
       final available = await _auth.getAvailableBiometrics();
-      return available.isNotEmpty || canCheck;
+      return available.isNotEmpty;
     } catch (e) {
       debugPrint('Error checking enrolled biometrics: $e');
       return false;
@@ -65,12 +66,40 @@ class BiometricService {
         return 'Face ID';
       } else if (biometrics.contains(BiometricType.fingerprint) ||
           biometrics.contains(BiometricType.strong)) {
-        return 'Vân tay';
+        return 'Fingerprint';
       } else if (biometrics.contains(BiometricType.iris)) {
-        return 'Mống mắt';
+        return 'Iris';
       }
     } catch (_) {}
-    return 'Sinh trắc học';
+    return 'Biometrics';
+  }
+
+  /// Get localized user-friendly label for primary biometric sensor on this device
+  Future<String> getLocalizedBiometricTypeLabel(AppLocalizations l10n) async {
+    final rawLabel = await getBiometricTypeLabel();
+    if (rawLabel == 'Face ID') return 'Face ID';
+    if (rawLabel == 'Touch ID') return 'Touch ID';
+    final primary = await getPrimaryBiometricType();
+    if (primary == BiometricType.fingerprint) return l10n.biometricFingerprint;
+    if (primary == BiometricType.iris) return l10n.biometricIris;
+    if (primary == BiometricType.face) return 'Face ID';
+    return l10n.biometricGeneral;
+  }
+
+  /// Get the primary biometric sensor type enum directly
+  Future<BiometricType?> getPrimaryBiometricType() async {
+    try {
+      final biometrics = await getAvailableBiometrics();
+      if (biometrics.contains(BiometricType.face)) {
+        return BiometricType.face;
+      } else if (biometrics.contains(BiometricType.fingerprint) ||
+          biometrics.contains(BiometricType.strong)) {
+        return BiometricType.fingerprint;
+      } else if (biometrics.contains(BiometricType.iris)) {
+        return BiometricType.iris;
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Get list of available biometric types (Fingerprint, Face, Iris)
@@ -85,19 +114,19 @@ class BiometricService {
 
   /// Prompt native biometric authentication dialog
   Future<bool> authenticate({
-    String localizedReason = 'Vui lòng xác thực để mở khóa HubSight',
+    String localizedReason = 'Please authenticate to unlock HubSight',
   }) async {
     if (isAuthenticating) return false;
     isAuthenticating = true;
     try {
-      final isSupported = await canCheckBiometrics();
-      if (!isSupported) return false;
+      final canAuth = await canAuthenticateWithBiometrics();
+      if (!canAuth) return false;
 
       return await _auth.authenticate(
         localizedReason: localizedReason,
         options: const AuthenticationOptions(
           stickyAuth: true,
-          biometricOnly: false,
+          biometricOnly: true,
           useErrorDialogs: true,
         ),
       );

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import 'login_screen.dart';
+import '../common/main_tab_screen.dart';
 
 class AppLockScreen extends ConsumerStatefulWidget {
   final VoidCallback onUnlocked;
@@ -42,6 +44,25 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
     _initBiometrics();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context);
+    if (l10n != null) {
+      _updateBiometricLabel(l10n);
+    }
+  }
+
+  Future<void> _updateBiometricLabel(AppLocalizations l10n) async {
+    final bioService = ref.read(biometricServiceProvider);
+    final label = await bioService.getLocalizedBiometricTypeLabel(l10n);
+    if (mounted) {
+      setState(() {
+        _biometricLabel = label;
+      });
+    }
+  }
+
   Future<void> _initBiometrics() async {
     final bioService = ref.read(biometricServiceProvider);
     final label = await bioService.getBiometricTypeLabel();
@@ -54,8 +75,8 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
       });
     }
 
-    // Auto-prompt biometric if enabled or available and not in PIN setup mode
-    if (!widget.isCreatingPin && (bioService.isBiometricEnabled || canAuth)) {
+    // Auto-prompt biometric only if device actually has enrolled biometrics and biometric is enabled
+    if (!widget.isCreatingPin && canAuth && bioService.isBiometricEnabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _tryBiometricUnlock();
       });
@@ -68,19 +89,49 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
     super.dispose();
   }
 
+  void _onUnlockSuccess() {
+    HapticFeedback.mediumImpact();
+    widget.onUnlocked();
+    if (mounted) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const MainTabScreen(),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _tryBiometricUnlock() async {
     final bioService = ref.read(biometricServiceProvider);
     final canAuth = await bioService.canAuthenticateWithBiometrics();
-    if (!canAuth) return;
+    final l10n = mounted ? AppLocalizations.of(context) : null;
+
+    if (!canAuth) {
+      _showError(l10n?.loginBiometricNotEnrolled ??
+          'Thiết bị chưa cài đặt vân tay hoặc Face ID trong Cài đặt máy.');
+      return;
+    }
+
+    final reason = l10n?.lockBiometricReason(_biometricLabel) ??
+        'Xác thực $_biometricLabel để mở khóa HubSight';
 
     final success = await bioService.authenticate(
-      localizedReason: 'Xác thực $_biometricLabel để mở khóa HubSight',
+      localizedReason: reason,
     );
     if (success && mounted) {
       if (!bioService.isBiometricEnabled) {
         await bioService.setBiometricEnabled(true);
       }
-      widget.onUnlocked();
+      _onUnlockSuccess();
+    } else if (mounted) {
+      _showError(l10n?.loginBiometricFailed ?? 'Xác thực sinh trắc học thất bại hoặc đã bị huỷ.');
     }
   }
 
@@ -110,6 +161,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
 
   void _handlePinComplete() async {
     final bioService = ref.read(biometricServiceProvider);
+    final l10n = mounted ? AppLocalizations.of(context) : null;
 
     if (widget.isCreatingPin) {
       if (!_isConfirming) {
@@ -122,9 +174,9 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
         if (_enteredPin == _confirmedPin) {
           await bioService.savePin(_enteredPin);
           widget.onPinCreated?.call(_enteredPin);
-          widget.onUnlocked();
+          _onUnlockSuccess();
         } else {
-          _showError('Mã PIN xác nhận không khớp. Vui lòng thử lại.');
+          _showError(l10n?.lockPinMismatch ?? 'Mã PIN xác nhận không khớp');
           setState(() {
             _enteredPin = '';
             _confirmedPin = '';
@@ -134,16 +186,15 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
       }
     } else {
       if (!bioService.hasPin) {
-        _showError('Chưa có mã PIN. Vui lòng mở khóa bằng $_biometricLabel');
+        _showError(l10n?.lockNoPinPrompt(_biometricLabel) ?? 'Chưa thiết lập mã PIN');
         _tryBiometricUnlock();
         return;
       }
       final isValid = bioService.verifyPin(_enteredPin);
       if (isValid) {
-        HapticFeedback.mediumImpact();
-        widget.onUnlocked();
+        _onUnlockSuccess();
       } else {
-        _showError('Mã PIN không chính xác');
+        _showError(l10n?.lockPinIncorrect ?? 'Mã PIN không đúng');
         setState(() {
           _enteredPin = '';
         });
@@ -175,12 +226,16 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final bioService = ref.watch(biometricServiceProvider);
+    final l10n = AppLocalizations.of(context);
 
-    String titleText = 'Nhập mã PIN để mở khóa';
+    String titleText = l10n?.lockEnterPin ?? 'Nhập mã PIN bảo mật';
     if (widget.isCreatingPin) {
-      titleText = _isConfirming ? 'Xác nhận lại mã PIN' : 'Thiết lập mã PIN mới';
+      titleText = _isConfirming
+          ? (l10n?.lockConfirmPin ?? 'Xác nhận lại mã PIN mới')
+          : (l10n?.lockSetNewPin ?? 'Thiết lập mã PIN 4 chữ số');
     } else if (_canUseBiometric || bioService.isBiometricEnabled) {
-      titleText = 'Nhập PIN hoặc dùng $_biometricLabel';
+      titleText = l10n?.lockEnterPinOrBiometric(_biometricLabel) ??
+          'Nhập mã PIN hoặc sử dụng $_biometricLabel';
     }
 
     return Scaffold(
@@ -314,9 +369,9 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
             if (!widget.isCreatingPin)
               TextButton(
                 onPressed: _handleLogout,
-                child: const Text(
-                  'Đăng xuất khỏi tài khoản',
-                  style: TextStyle(
+                child: Text(
+                  l10n?.lockLogoutAccount ?? 'Đăng xuất khỏi tài khoản',
+                  style: const TextStyle(
                     color: HubSightColors.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -326,9 +381,9 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
             else
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'Hủy bỏ',
-                  style: TextStyle(color: HubSightColors.textMuted, fontSize: 13),
+                child: Text(
+                  l10n?.cancel ?? 'Huỷ',
+                  style: const TextStyle(color: HubSightColors.textMuted, fontSize: 13),
                 ),
               ),
 

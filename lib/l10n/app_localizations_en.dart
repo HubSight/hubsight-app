@@ -755,4 +755,536 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get presetNamePrompt => 'Enter preset point name:';
+
+  @override
+  String get biometricFingerprint => 'Fingerprint';
+
+  @override
+  String get biometricIris => 'Iris';
+
+  @override
+  String get biometricGeneral => 'Biometrics';
+
+  @override
+  String get biometricDefaultReason => 'Please authenticate to unlock HubSight';
+
+  @override
+  String lockBiometricReason(Object biometric) {
+    return 'Authenticate $biometric to unlock HubSight';
+  }
+
+  @override
+  String get lockPinMismatch =>
+      'Confirmation PIN does not match. Please try again.';
+
+  @override
+  String lockNoPinPrompt(Object biometric) {
+    return 'No PIN set. Please unlock using $biometric';
+  }
+
+  @override
+  String get lockPinIncorrect => 'Incorrect PIN code';
+
+  @override
+  String get lockEnterPin => 'Enter PIN code to unlock';
+
+  @override
+  String get lockConfirmPin => 'Re-enter PIN to confirm';
+
+  @override
+  String get lockSetNewPin => 'Set up new PIN code';
+
+  @override
+  String lockEnterPinOrBiometric(Object biometric) {
+    return 'Enter PIN or use $biometric';
+  }
+
+  @override
+  String get lockLogoutAccount => 'Logout of account';
+
+  @override
+  String loginQuickBiometricReason(Object biometric) {
+    return 'Quick sign-in with $biometric to HubSight';
+  }
+
+  @override
+  String get serverNotConfigured => 'Server not configured';
+
+  @override
+  String get configureServerNow => 'Configure server now';
+
+  @override
+  String get recoveryCodeHint => 'Enter 8-16 char recovery code';
+
+  @override
+  String get useTotpCode => 'Use 6-digit verification code';
+
+  @override
+  String get backToLogin => 'Back to login';
+
+  @override
+  String get onvifModeSystemCameras => 'Cameras in system';
+
+  @override
+  String get onvifModeCustomIp => 'Custom IP/Host';
+
+  @override
+  String get onvifHostHint => '192.168.1.100 or hostname';
+
+  @override
+  String get onvifPasswordHint => 'ONVIF password (if any)';
+
+  @override
+  String get probingCamera => 'Probing...';
+
+  @override
+  String get onvifPtzSupported => 'PTZ Supported';
+
+  @override
+  String get onvifDeviceInfo => 'Device Information';
+
+  @override
+  String get onvifManufacturer => 'Manufacturer';
+
+  @override
+  String get onvifModel => 'Model';
+
+  @override
+  String get onvifFirmwareVersion => 'Firmware Version';
+
+  @override
+  String get onvifSerialNumber => 'Serial Number';
+
+  @override
+  String get onvifMediaProfiles => 'Media Profiles';
+
+  @override
+  String get onvifNoProfiles => 'Could not extract media profiles.';
+
+  @override
+  String get onvifRtspCopied => 'RTSP Stream URI copied to clipboard!';
+
+  @override
+  String aiAlertNotification(Object camera, Object event) {
+    return 'AI Alert: $event at camera $camera';
+  }
+
+  @override
+  String get allCameras => 'All';
+
+  @override
+  String get recentRecognitions => 'Recent Recognition Logs';
+
+  @override
+  String eventsCount(Object count) {
+    return '$count events';
+  }
+
+  @override
+  String get noRecognitionData => 'No facial recognition data available';
+
+  @override
+  String get stranger => 'Stranger';
+
+  @override
+  String get noActiveStreamingCameras =>
+      'No active cameras available for live streaming';
+
+  @override
+  String get ptzPresetHint => 'e.g. Front Gate, Window, Backyard';
+
+  @override
+  String ptzPresetSaved(Object name) {
+    return 'Preset saved: $name';
+  }
+
+  @override
+  String ptzPresetSaveFailed(Object error) {
+    return 'Failed to save preset: $error';
+  }
+
+  @override
+  String get ptzDeletePresetTitle => 'Delete Preset';
+
+  @override
+  String ptzDeletePresetConfirm(Object name) {
+    return 'Are you sure you want to delete preset \"$name\"?';
+  }
+
+  @override
+  String ptzPresetDeleted(Object name) {
+    return 'Preset deleted: $name';
+  }
+
+  @override
+  String ptzPresetDeleteFailed(Object error) {
+    return 'Failed to delete preset: $error';
+  }
+
+  @override
+  String ptzCommandFailed(Object error) {
+    return 'PTZ command failed: $error';
+  }
+
+  @override
+  String get ptzHoldInstruction =>
+      'Press and hold arrow buttons to pan/tilt camera, release to stop.';
+
+  @override
+  String get ptzNoPresets => 'No presets saved for this camera yet.';
+
+  @override
+  String ptzMovingTo(Object name) {
+    return 'Moving camera to: $name';
+  }
+
+  @override
+  String ptzMoveFailed(Object error) {
+    return 'Failed to move camera: $error';
+  }
+
+  @override
+  String get webrtcErrBadGateway =>
+      'Server or camera connection temporarily disrupted (502 Bad Gateway). Retrying...';
+
+  @override
+  String get webrtcErrNotFound =>
+      'Camera does not exist or has been removed from system.';
+
+  @override
+  String get webrtcErrUnauthorized =>
+      'Session expired or you do not have permission to view this camera.';
+
+  @override
+  String get webrtcErrNetwork =>
+      'Cannot connect to server. Please check your network connection.';
+
+  @override
+  String webrtcErrConnection(Object error) {
+    return 'Camera connection error: $error';
+  }
+
+  @override
+  String webrtcReconnecting(Object count, Object max) {
+    return 'Reconnecting video stream automatically ($count/$max)...';
+  }
+
+  @override
+  String get webrtcErrSdkNotReady => 'SDK has not been initialized';
+
+  @override
+  String get webrtcErrStreamFailed => 'Cannot connect to live stream.';
+
+  @override
+  String fallAlertWarning(Object count) {
+    return 'WARNING: FALL DETECTED ($count)';
+  }
+
+  @override
+  String get webrtcConnecting => 'Connecting WebRTC (WHEP)...';
+
+  @override
+  String get webrtcStreamUnavailable => 'Live stream unavailable';
+
+  @override
+  String get retryButton => 'Retry';
+
+  @override
+  String get markAllRead => 'Mark all as read';
+
+  @override
+  String get noUnreadNotifications => 'No unread notifications';
+
+  @override
+  String get noUnreadNotificationsDesc =>
+      'You have reviewed all security alerts';
+
+  @override
+  String get noNotificationsDesc =>
+      'Security alerts and AI events will appear here';
+
+  @override
+  String passkeyDefaultDeviceName(Object biometric) {
+    return '$biometric on this device';
+  }
+
+  @override
+  String get securitySectionTitle => 'App Security';
+
+  @override
+  String get noOtherSessions => 'No other active sessions';
+
+  @override
+  String get thisDevice => 'This device';
+
+  @override
+  String otherSessionsCount(Object count) {
+    return '$count other active sessions';
+  }
+
+  @override
+  String get tapToCollapse => 'Tap to collapse';
+
+  @override
+  String get tapToManageAndRevoke => 'Tap to manage and revoke';
+
+  @override
+  String get genericDevice => 'Device';
+
+  @override
+  String get changePinTitle => 'Change Security PIN';
+
+  @override
+  String get changePinSubtitle => 'Reset your backup 4-digit PIN';
+
+  @override
+  String get pinUpdatedSuccess => 'New PIN code updated successfully';
+
+  @override
+  String get notConfigured => 'Not configured';
+
+  @override
+  String serverProfileActive(Object name) {
+    return 'Profile: $name • Active';
+  }
+
+  @override
+  String get gatewayNotConnected => 'Gateway port not connected';
+
+  @override
+  String get confirmLogout =>
+      'Are you sure you want to log out of this account?';
+
+  @override
+  String configPickFileError(Object error) {
+    return 'Could not select file: $error';
+  }
+
+  @override
+  String configQrAnalyzeError(Object error) {
+    return 'Error analyzing QR image: $error';
+  }
+
+  @override
+  String get configNoDataFromServer =>
+      'No data returned from configuration server.';
+
+  @override
+  String get configNoFileSelectedError =>
+      'No configuration file selected. Please go back to the previous step.';
+
+  @override
+  String get configDecryptingSignature =>
+      'Decrypting container and verifying digital signature...';
+
+  @override
+  String get configSavingSystem => 'Saving system configuration...';
+
+  @override
+  String get configSuccessLoginPrompt =>
+      'Server configured successfully! Please log in.';
+
+  @override
+  String configSaveError(Object error) {
+    return 'Error saving configuration: $error';
+  }
+
+  @override
+  String get configStepWelcome => 'HubSight Setup';
+
+  @override
+  String get configStepMethod => 'Connection Method';
+
+  @override
+  String get configStepPickFile => 'Select Config File';
+
+  @override
+  String get configStepScanQr => 'Scan QR Code';
+
+  @override
+  String get configStepPin => 'Security PIN';
+
+  @override
+  String get configStepSummary => 'Confirm Configuration';
+
+  @override
+  String get processing => 'Processing...';
+
+  @override
+  String get configWelcomeTitle => 'Welcome to HubSight';
+
+  @override
+  String get configWelcomeSubtitle =>
+      'To connect the app to your surveillance server, please import the secure configuration container (.hscfg) or scan the QR code provided by your administrator.';
+
+  @override
+  String get configFeatureE2eeTitle => 'Multi-layer End-to-End Encryption';
+
+  @override
+  String get configFeatureE2eeDesc =>
+      'Protected by Argon2id key derivation and military-grade AES-256-GCM encryption.';
+
+  @override
+  String get configFeatureEd25519Title =>
+      'Ed25519 Digital Signature Verification';
+
+  @override
+  String get configFeatureEd25519Desc =>
+      'Guarantees container authenticity, preventing tampering or unauthorized server redirection.';
+
+  @override
+  String get configFeatureZeroConfigTitle => 'Zero-Config Setup';
+
+  @override
+  String get configFeatureZeroConfigDesc =>
+      'Automatically configures Gateway, WebSocket Relay, and WebRTC in seconds.';
+
+  @override
+  String get configStartSetup => 'Start Setup';
+
+  @override
+  String get configSelectMethodTitle => 'Select Connection Method';
+
+  @override
+  String get configSelectMethodDesc =>
+      'Choose the most convenient method to import connection parameters into the app:';
+
+  @override
+  String get configMethodQrTitle => 'Scan Configuration QR';
+
+  @override
+  String get configMethodQrDesc =>
+      'Use device camera to scan configuration QR code directly from computer screen or saved photo.';
+
+  @override
+  String get configMethodRecommended => 'Recommended';
+
+  @override
+  String get configMethodFileTitle => 'Select Config File (.hscfg)';
+
+  @override
+  String get configMethodFileDesc =>
+      'Select the secure container file (.hscfg) downloaded on your device.';
+
+  @override
+  String get backButton => 'Back';
+
+  @override
+  String get configPickFileTitle => 'Select Config File (.hscfg)';
+
+  @override
+  String get configPickFileSubtitle =>
+      'Select the secure container file exported from the system by your administrator.';
+
+  @override
+  String get configTapToPickFile => 'Tap to select .hscfg file';
+
+  @override
+  String configFileSizeKb(Object size) {
+    return 'File size: $size KB';
+  }
+
+  @override
+  String get configStandardFormatSupport =>
+      'Supports standard .hscfg container';
+
+  @override
+  String get configReadyToDecrypt => 'READY TO DECRYPT';
+
+  @override
+  String get configPickAnotherFile => 'Choose another file';
+
+  @override
+  String get configQrInstruction =>
+      'Point camera at configuration QR code to scan automatically';
+
+  @override
+  String get configFlashTooltip => 'Flashlight';
+
+  @override
+  String get configQrPickGallery => 'Pick QR from gallery';
+
+  @override
+  String get configSwitchCameraTooltip => 'Switch camera';
+
+  @override
+  String get configQrFallbackName => 'QR Code';
+
+  @override
+  String get configEnterPinTitle => 'Enter Security PIN (6 digits)';
+
+  @override
+  String get configEnterPinSubtitle =>
+      'Enter the 6-digit PIN provided by your administrator to unpack and decrypt data container.';
+
+  @override
+  String get configDecryptButton => 'Unpack & Decrypt';
+
+  @override
+  String get configDecryptionSuccess => 'Decryption & Verification Successful';
+
+  @override
+  String get configSignatureValid =>
+      'Valid Ed25519 digital signature. Authentic file.';
+
+  @override
+  String get configConfirmTitle => 'Confirm Configuration Details';
+
+  @override
+  String get configConfirmSubtitle =>
+      'Review connection parameters carefully before saving and activating application:';
+
+  @override
+  String get configSummarySystemName => 'System Name';
+
+  @override
+  String get configSummaryConfigId => 'Config ID';
+
+  @override
+  String get configSummaryGateway => 'Gateway Server';
+
+  @override
+  String get configSummaryClientName => 'Client Name';
+
+  @override
+  String get configSummaryCreatedBy => 'Created By';
+
+  @override
+  String get configSummaryCreatedAt => 'Created At';
+
+  @override
+  String get none => 'None';
+
+  @override
+  String get configSummaryProfileVersion => 'Profile Version';
+
+  @override
+  String get configConfirmAndProceed => 'Accept & Proceed to Login';
+
+  @override
+  String get configResetFromScratch => 'Reset from Beginning';
+
+  @override
+  String get splashTagline => 'Intelligent Video Surveillance & Management';
+
+  @override
+  String get splashSubtitle => 'Enterprise CCTV & AI Security Platform';
+
+  @override
+  String get splashInitializing => 'Initializing security environment...';
+
+  @override
+  String get liveTab => 'Live';
+
+  @override
+  String get playbackTab => 'Playback';
+
+  @override
+  String get ptzControlPanel => 'PTZ Controls';
+
+  @override
+  String get ptzSwipeHint => 'Swipe video to steer camera';
+
+  @override
+  String get ptzQuickAction => 'PTZ Control';
 }

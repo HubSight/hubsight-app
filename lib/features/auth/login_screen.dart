@@ -24,6 +24,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _usernameController = TextEditingController(text: '');
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -48,6 +49,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _initBiometricStatus();
       _checkQuickBiometricLogin();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context);
+    if (l10n != null) {
+      ref.read(biometricServiceProvider).getLocalizedBiometricTypeLabel(l10n).then((label) {
+        if (mounted) {
+          setState(() => _biometricLabel = label);
+        }
+      });
+    }
   }
 
   void _initBiometricStatus() async {
@@ -97,8 +111,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final isAuthed = await sdk.auth.isAuthenticated;
       if (isAuthed) {
         final label = _biometricLabel ?? 'Face ID';
+        final l10n = mounted ? AppLocalizations.of(context) : null;
         final success = await bio.authenticate(
-          localizedReason: 'Đăng nhập nhanh bằng $label vào HubSight',
+          localizedReason: l10n?.loginQuickBiometricReason(label) ??
+              'Đăng nhập nhanh bằng $label vào HubSight',
         );
         if (success && mounted) {
           _navigateToHome();
@@ -267,7 +283,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     // 3. Prompt native Face ID / Touch ID dialog
-    final label = _biometricLabel ?? 'Sinh trắc học';
+    final label = _biometricLabel ?? l10n.biometricGeneral;
     final success = await bio.authenticate(
       localizedReason: '$label: ${l10n.loginBiometricPrompt}',
     );
@@ -397,7 +413,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                _biometricLabel ?? 'Sinh trắc học',
+                _biometricLabel ?? l10n.biometricGeneral,
                 style: const TextStyle(
                     color: HubSightColors.textPrimary,
                     fontSize: 16,
@@ -429,7 +445,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return l10n.loginPasskeyBtnFaceId;
     } else if (_biometricLabel == 'Touch ID') {
       return l10n.loginPasskeyBtnTouchId;
-    } else if (_biometricLabel == 'Vân tay') {
+    } else if (_biometricLabel == l10n.biometricFingerprint ||
+        _biometricLabel == 'Vân tay' ||
+        _biometricLabel == 'Fingerprint') {
       return l10n.loginPasskeyBtnFingerprint;
     }
     return l10n.loginPasskeyBtn;
@@ -563,6 +581,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     _totpController.dispose();
     _recoveryCodeController.dispose();
     super.dispose();
@@ -685,7 +704,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 Flexible(
                                   child: Text(
                                     sdk?.config.urls.gatewayUrl ??
-                                        'Chưa cấu hình máy chủ',
+                                        l10n.serverNotConfigured,
                                     style: const TextStyle(
                                       color: Color(0xFFA1A1AA),
                                       fontSize: 11.5,
@@ -939,9 +958,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               icon: const Icon(
                                                   Icons.qr_code_scanner_rounded,
                                                   size: 15),
-                                              label: const Text(
-                                                'Cấu hình máy chủ ngay',
-                                                style: TextStyle(
+                                              label: Text(
+                                                l10n.configureServerNow,
+                                                style: const TextStyle(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold),
                                               ),
@@ -968,6 +987,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   const SizedBox(height: 6),
                                   TextField(
                                     controller: _usernameController,
+                                    textInputAction: TextInputAction.next,
+                                    onSubmitted: (_) =>
+                                        _passwordFocusNode.requestFocus(),
                                     style: const TextStyle(
                                         color: Color(0xFFF4F4F5),
                                         fontSize: 14),
@@ -1021,7 +1043,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   const SizedBox(height: 6),
                                   TextField(
                                     controller: _passwordController,
+                                    focusNode: _passwordFocusNode,
                                     obscureText: _obscurePassword,
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) {
+                                      if (!_isLoading) _handleLogin();
+                                    },
                                     style: const TextStyle(
                                         color: Color(0xFFF4F4F5),
                                         fontSize: 14),
@@ -1242,6 +1269,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     TextField(
                                       controller: _totpController,
                                       keyboardType: TextInputType.number,
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) {
+                                        if (!_isVerifying2FA) _handleVerify2FA();
+                                      },
                                       maxLength: 6,
                                       style: const TextStyle(
                                         color: Color(0xFFF4F4F5),
@@ -1284,6 +1315,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   else
                                     TextField(
                                       controller: _recoveryCodeController,
+                                      textInputAction: TextInputAction.done,
+                                      onSubmitted: (_) {
+                                        if (!_isVerifying2FA) _handleVerify2FA();
+                                      },
                                       style: const TextStyle(
                                         color: Color(0xFFF4F4F5),
                                         fontSize: 14,
@@ -1294,7 +1329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       decoration: InputDecoration(
                                         filled: true,
                                         fillColor: const Color(0xFF18181B),
-                                        hintText: 'Nhập mã khôi phục 8-16 ký tự',
+                                        hintText: l10n.recoveryCodeHint,
                                         hintStyle: const TextStyle(
                                             color: Color(0xFF71717A)),
                                         border: OutlineInputBorder(
@@ -1332,7 +1367,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       },
                                       child: Text(
                                         _useRecoveryCode
-                                            ? 'Sử dụng mã xác thực 6 số'
+                                            ? l10n.useTotpCode
                                             : l10n.useRecoveryCode,
                                         style: const TextStyle(
                                           color: Color(0xFFEA580C),
@@ -1400,9 +1435,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         size: 14,
                                         color: Color(0xFF71717A),
                                       ),
-                                      label: const Text(
-                                        'Quay lại đăng nhập',
-                                        style: TextStyle(
+                                      label: Text(
+                                        l10n.backToLogin,
+                                        style: const TextStyle(
                                           color: Color(0xFF71717A),
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
