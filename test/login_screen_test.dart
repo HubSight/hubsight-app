@@ -75,6 +75,12 @@ void main() {
 
       // Check header and branding
       expect(find.text('HubSight'), findsOneWidget);
+      expect(
+        find.byKey(const Key('login-server-config-badge')),
+        findsOneWidget,
+      );
+      expect(find.text('Chưa cấu hình máy chủ'), findsOneWidget);
+      expect(find.byIcon(Icons.file_upload_outlined), findsOneWidget);
       expect(find.text('TÊN ĐĂNG NHẬP'), findsOneWidget);
       expect(find.text('MẬT KHẨU'), findsOneWidget);
 

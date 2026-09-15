@@ -130,6 +130,18 @@ class SdkStateNotifier extends StateNotifier<HubSightSDK?> {
   }
 }
 
+/// Returns true only when the SDK uses an imported server profile.
+///
+/// Older app versions persisted a built-in `default_config`; treating that
+/// fallback as provisioned would incorrectly allow users to reach Login.
+bool hasImportedHubSightConfig(HubSightSDK? sdk) {
+  if (sdk == null) return false;
+  final config = sdk.config;
+  final isLegacyDefault = config.metadata.configId == 'default_config' &&
+      config.key.clientId == 'hs_mob_default';
+  return !isLegacyDefault;
+}
+
 /// Central Riverpod provider exposing the [HubSightSDK] instance.
 final hubsightSdkProvider =
     StateNotifierProvider<SdkStateNotifier, HubSightSDK?>((ref) {

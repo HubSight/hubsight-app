@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hubsight_sdk/hubsight_sdk.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/services/fcm_service.dart';
@@ -10,6 +9,7 @@ import '../../core/theme/theme_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/app_lock_screen.dart';
 import '../auth/login_screen.dart';
+import '../config/server_config_screen.dart';
 import 'main_tab_screen.dart';
 import 'maintenance_screen.dart';
 
@@ -67,13 +67,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     // 1. Restore or initialize the SDK so runtime Firebase config is available.
     bool isAuthenticated = false;
+    bool hasImportedConfig = false;
     try {
       final sdkNotifier = ref.read(hubsightSdkProvider.notifier);
       final restored = await sdkNotifier.restoreFromStorage();
 
       if (restored) {
         final sdk = ref.read(hubsightSdkProvider);
-        if (sdk != null) {
+        hasImportedConfig = hasImportedHubSightConfig(sdk);
+        if (sdk != null && hasImportedConfig) {
           isAuthenticated = await sdk.auth.isAuthenticated;
           if (isAuthenticated) {
             try {
@@ -81,32 +83,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               ref.read(appThemeModeProvider.notifier).syncFromProfile(profile.theme);
             } catch (_) {}
           }
-        }
-      } else {
-        // Default initial server configuration for seamless out-of-the-box login
-        const defaultServerUrl = 'https://cctv.quoctran.space';
-        const defaultConfig = HubSightAppConfig(
-          urls: HubSightUrls(
-            gatewayUrl: defaultServerUrl,
-            apiBaseUrl: '$defaultServerUrl/api',
-            relayWsUrl: 'wss://cctv.quoctran.space/relay',
-            webrtcBaseUrl: '$defaultServerUrl:8555',
-          ),
-          key: HubSightClientKey(
-            clientId: 'hs_mob_default',
-            clientSecret: '',
-            clientName: 'HubSight Mobile',
-          ),
-          metadata: HubSightConfigMetadata(
-            formatVersion: '1.0',
-            configId: 'default_config',
-            name: 'HubSight Server',
-          ),
-        );
-        try {
-          await sdkNotifier.initializeFromConfig(defaultConfig);
-        } catch (e) {
-          debugPrint('Default SDK config initialization error: $e');
         }
       }
     } catch (e) {
@@ -136,7 +112,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       return;
     }
 
-    // 5. Determine target route (no MainTabScreen flashing if App Lock is enabled)
+    // 5. A real imported profile is mandatory before Login can be displayed.
+    if (!hasImportedConfig) {
+      _navigateTo(const ServerConfigScreen(isInitialSetup: true));
+      return;
+    }
+
+    // 6. Determine target route (no MainTabScreen flashing if App Lock is enabled)
     if (isAuthenticated) {
       final bio = ref.read(biometricServiceProvider);
       if (bio.isAppLockEnabled) {

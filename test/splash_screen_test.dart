@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hubsight_app/core/services/biometric_service.dart';
 import 'package:hubsight_app/core/services/fcm_service.dart';
 import 'package:hubsight_app/core/storage/storage_service.dart';
-import 'package:hubsight_app/features/auth/login_screen.dart';
+import 'package:hubsight_app/features/config/server_config_screen.dart';
 import 'package:hubsight_app/features/common/splash_screen.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,7 +76,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 10));
     });
 
-    testWidgets('unauthenticated launch navigates to LoginScreen smoothly', (tester) async {
+    testWidgets('launch without imported config requires config wizard', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -102,9 +102,9 @@ void main() {
       // Advance time beyond minDisplayDuration
       await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
-      // Should have transitioned to LoginScreen
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.text('Đăng nhập'), findsOneWidget);
+      // Login is inaccessible until a real .hscfg profile is imported.
+      expect(find.byType(ServerConfigScreen), findsOneWidget);
+      expect(find.text('Chào mừng đến với HubSight'), findsOneWidget);
     });
   });
 }

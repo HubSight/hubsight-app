@@ -112,7 +112,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       sdk = ref.read(hubsightSdkProvider);
     }
 
-    if (bio.isBiometricEnabled && sdk != null) {
+    if (bio.isBiometricEnabled &&
+        sdk != null && hasImportedHubSightConfig(sdk)) {
       final isAuthed = await sdk.auth.isAuthenticated;
       if (isAuthed) {
         final label = _biometricLabel ?? 'Face ID';
@@ -144,24 +145,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       var sdk = ref.read(hubsightSdkProvider);
       if (sdk == null) {
-        // Try restoring or initialize with default config
-        final restored =
-            await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
-        if (!restored) {
-          // If still null, route user to config setup
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ServerConfigScreen()),
-            );
-          }
-          return;
-        }
+        await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
         sdk = ref.read(hubsightSdkProvider);
       }
 
-      if (sdk == null) return;
+      if (!hasImportedHubSightConfig(sdk)) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ServerConfigScreen()),
+            (route) => false,
+          );
+        }
+        return;
+      }
 
-      final result = await sdk.auth.login(
+      final result = await sdk!.auth.login(
         username: username,
         password: password,
       );
@@ -564,6 +562,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sdk = ref.watch(hubsightSdkProvider);
+    final hasImportedConfig = hasImportedHubSightConfig(sdk);
     final appLocale = ref.watch(appLocaleProvider);
 
     return Scaffold(
@@ -645,20 +644,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const ServerConfigScreen(
-                                    isInitialSetup: false),
+                                builder: (_) => ServerConfigScreen(
+                                  isInitialSetup: !hasImportedConfig,
+                                ),
                               ),
                             );
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
+                            key: const Key('login-server-config-badge'),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: const Color(0xEB09090B),
+                              color: hasImportedConfig
+                                  ? const Color(0xEB09090B)
+                                  : const Color(0x26F59E0B),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: const Color(0xFF27272A), width: 1.0),
+                                  color: hasImportedConfig
+                                      ? const Color(0xFF27272A)
+                                      : const Color(0x99F59E0B),
+                                  width: 1.0),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -667,7 +673,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   width: 7,
                                   height: 7,
                                   decoration: BoxDecoration(
-                                    color: sdk != null
+                                    color: hasImportedConfig
                                         ? HubSightColors.success
                                         : Colors.amber,
                                     shape: BoxShape.circle,
@@ -676,19 +682,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    sdk?.config.urls.gatewayUrl ??
-                                        l10n.serverNotConfigured,
-                                    style: const TextStyle(
-                                      color: Color(0xFFA1A1AA),
+                                    hasImportedConfig
+                                        ? sdk!.config.urls.gatewayUrl
+                                        : l10n.serverNotConfigured,
+                                    key: const Key('login-server-config-label'),
+                                    style: TextStyle(
+                                      color: hasImportedConfig
+                                          ? const Color(0xFFA1A1AA)
+                                          : const Color(0xFFFBBF24),
                                       fontSize: 11.5,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: hasImportedConfig
+                                          ? FontWeight.w500
+                                          : FontWeight.w600,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                const Icon(Icons.tune_rounded,
-                                    size: 13, color: Color(0xFF71717A)),
+                                Icon(
+                                  hasImportedConfig
+                                      ? Icons.tune_rounded
+                                      : Icons.file_upload_outlined,
+                                  size: 13,
+                                  color: hasImportedConfig
+                                      ? const Color(0xFF71717A)
+                                      : const Color(0xFFFBBF24),
+                                ),
                               ],
                             ),
                           ),
