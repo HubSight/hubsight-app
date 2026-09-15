@@ -580,7 +580,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginOrDivider => 'OR';
 
   @override
-  String get loginPasskeyBtn => 'Sign in with Biometrics / Face ID';
+  String get loginPasskeyBtn => 'Sign in with Passkey';
+
+  @override
+  String get loginPasskeyUsernameRequired =>
+      'Enter your username before signing in with a Passkey.';
 
   @override
   String get loginPasskeyBtnFaceId => 'Sign in with Face ID';

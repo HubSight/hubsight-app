@@ -6,17 +6,27 @@ import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/services/fcm_service.dart';
+import '../../core/services/passkey_service.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../common/main_tab_screen.dart';
 import '../config/server_config_screen.dart';
 import 'change_password_dialog.dart';
 
+enum _LoginMethod { password, passkey }
+
 @visibleForTesting
 bool hasUsableLoginToken(AuthResult result) {
-  return result.isSuccess &&
-      result.accessToken != null &&
-      result.accessToken!.trim().isNotEmpty;
+  final token = result.accessToken?.trim();
+  if (!result.isSuccess ||
+      result.tokenType.toLowerCase() != 'bearer' ||
+      token == null ||
+      token.isEmpty) {
+    return false;
+  }
+
+  final claims = result.claims;
+  return claims == null || !claims.isExpired;
 }
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -34,7 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAppKeyError = false;
-  bool _isBiometricLoading = false;
+  bool _isPasskeyLoading = false;
   String? _biometricLabel;
 
   // 2FA State
@@ -45,6 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _useRecoveryCode = false;
   bool _isVerifying2FA = false;
   String? _twoFactorError;
+  _LoginMethod _pendingLoginMethod = _LoginMethod.password;
 
   @override
   void initState() {
@@ -114,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (bio.isBiometricEnabled &&
         sdk != null && hasImportedHubSightConfig(sdk)) {
-      final isAuthed = await sdk.auth.isAuthenticated;
+      final isAuthed = await ensureUsableHubSightSession(sdk);
       if (isAuthed) {
         final label = _biometricLabel ?? 'Face ID';
         final l10n = mounted ? AppLocalizations.of(context) : null;
@@ -168,6 +179,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Show 2FA Verification Dialog
         setState(() {
           _preAuthToken = result.preAuthToken;
+          _pendingLoginMethod = _LoginMethod.password;
           _showTwoFactorModal = true;
           _isLoading = false;
         });
@@ -225,7 +237,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         await _onLoginSuccess(
           result,
           username: _usernameController.text.trim(),
-          password: _passwordController.text.trim(),
+          password: _pendingLoginMethod == _LoginMethod.password
+              ? _passwordController.text.trim()
+              : null,
         );
       } else {
         setState(() {
@@ -243,182 +257,88 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  Future<void> _handleBiometricLogin() async {
-    if (_isLoading || _isBiometricLoading) return;
+  Future<void> _handlePasskeyLogin() async {
+    if (_isLoading || _isPasskeyLoading) return;
+    final username = _usernameController.text.trim();
     final l10n = AppLocalizations.of(context)!;
-    final bio = ref.read(biometricServiceProvider);
+
+    if (username.isEmpty) {
+      setState(() {
+        _errorMessage = l10n.loginPasskeyUsernameRequired;
+        _isAppKeyError = false;
+      });
+      return;
+    }
 
     setState(() {
+      _isPasskeyLoading = true;
       _errorMessage = null;
       _isAppKeyError = false;
     });
 
-    // 1. Check biometric hardware / enrollment
-    final canCheck = await bio.canAuthenticateWithBiometrics();
-    if (!canCheck) {
-      final isSupported = await bio.canCheckBiometrics();
-      if (mounted) {
-        setState(() {
-          _errorMessage = isSupported
-              ? l10n.loginBiometricNotEnrolled
-              : l10n.loginBiometricNotSupported;
-        });
-      }
-      return;
-    }
-
-    // 2. Biometric sign-in requires saved credentials or an active session.
-    final hasCreds = await bio.hasBiometricCredentials();
-    var sdk = ref.read(hubsightSdkProvider);
-    if (sdk == null) {
-      await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
-      sdk = ref.read(hubsightSdkProvider);
-    }
-
-    final isAuthed = sdk != null ? await sdk.auth.isAuthenticated : false;
-
-    if (!hasCreds && !isAuthed) {
-      if (mounted) {
-        _showBiometricSetupNoticeDialog(l10n);
-      }
-      return;
-    }
-
-    // 3. Prompt native Face ID / Touch ID dialog
-    final label = _biometricLabel ?? l10n.biometricGeneral;
-    final success = await bio.authenticate(
-      localizedReason: '$label: ${l10n.loginBiometricPrompt}',
-    );
-
-    if (!success) {
-      return;
-    }
-
-    // 4. Use biometrics to unlock credentials saved in Keychain/Keystore,
-    // then use the standard app login endpoint to obtain Bearer tokens.
-    setState(() => _isBiometricLoading = true);
     try {
-      if (hasCreds) {
-        final creds = await bio.getBiometricCredentials();
-        if (creds != null && sdk != null) {
-          final result = await sdk.auth.login(
-            username: creds['username']!,
-            password: creds['password']!,
+      var sdk = ref.read(hubsightSdkProvider);
+      if (sdk == null) {
+        await ref.read(hubsightSdkProvider.notifier).restoreFromStorage();
+        sdk = ref.read(hubsightSdkProvider);
+      }
+
+      if (!hasImportedHubSightConfig(sdk)) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ServerConfigScreen()),
+            (route) => false,
           );
-          if (result.requires2FA) {
-            if (mounted) {
-              setState(() {
-                _preAuthToken = result.preAuthToken;
-                _showTwoFactorModal = true;
-                _isBiometricLoading = false;
-              });
-            }
-            return;
-          }
-          if (result.isSuccess) {
-            await _onLoginSuccess(
-              result,
-              username: creds['username']!,
-              password: creds['password']!,
-            );
-            return;
-          }
         }
+        return;
       }
 
-      // If an active session token exists, verify profile or refresh.
-      if (sdk != null && await sdk.auth.isAuthenticated) {
-        try {
-          await sdk.auth.getProfile();
-          if (mounted) _navigateToHome();
-          return;
-        } catch (_) {
-          final refreshed = await sdk.auth.refreshToken();
-          if (refreshed && mounted) {
-            _navigateToHome();
-            return;
-          }
+      final response = await sdk!.auth.getPasskeyLoginOptions(username);
+      final options = HubSightPasskeyOptions.fromResponse(response);
+      final credential = await ref
+          .read(passkeyServiceProvider)
+          .authenticate(options.publicKey);
+      final result = await sdk.auth.verifyPasskeyLogin(
+        challengeId: options.challengeId,
+        credential: credential,
+      );
+
+      if (result.requires2FA) {
+        if (mounted) {
+          setState(() {
+            _preAuthToken = result.preAuthToken;
+            _pendingLoginMethod = _LoginMethod.passkey;
+            _showTwoFactorModal = true;
+          });
         }
+        return;
       }
 
-      if (mounted) {
+      if (result.isSuccess) {
+        await _onLoginSuccess(result, username: username);
+      } else if (mounted) {
         setState(() {
-          _errorMessage = l10n.errSessionExpired;
+          _errorMessage = result.message ?? l10n.errAuthInvalidCredentials;
         });
       }
     } catch (e) {
       if (mounted) {
+        final isAppKeyErr = (e is HubSightAuthException) &&
+            (e.code == HubSightErrorCode.appKeyRequired ||
+                e.code == HubSightErrorCode.appKeyInvalidOrRevoked);
         setState(() {
           _errorMessage = AppErrorLocalizer.localize(e, l10n);
+          _isAppKeyError = isAppKeyErr;
         });
       }
     } finally {
       if (mounted) {
-        setState(() => _isBiometricLoading = false);
+        setState(() => _isPasskeyLoading = false);
       }
     }
   }
 
-  void _showBiometricSetupNoticeDialog(AppLocalizations l10n) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: HubSightColors.cardDark,
-        shape: RoundedRectangleBorder(
-          borderRadius: HubSightRadius.roundedCardLg,
-          side: const BorderSide(color: HubSightColors.borderDark, width: 1.0),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: HubSightColors.primaryBg,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.fingerprint_rounded,
-                  color: HubSightColors.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _biometricLabel ?? l10n.biometricGeneral,
-                style: const TextStyle(
-                    color: HubSightColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          l10n.loginBiometricNotConfigured,
-          style: const TextStyle(
-              color: HubSightColors.textSecondary, fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK',
-                style: TextStyle(
-                    color: HubSightColors.primary,
-                    fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getBiometricButtonText(AppLocalizations l10n) {
-    if (_biometricLabel == 'Face ID') {
-      return l10n.loginPasskeyBtnFaceId;
-    } else if (_biometricLabel == 'Touch ID') {
-      return l10n.loginPasskeyBtnTouchId;
-    } else if (_biometricLabel == l10n.biometricFingerprint ||
-        _biometricLabel == 'Vân tay' ||
-        _biometricLabel == 'Fingerprint') {
-      return l10n.loginPasskeyBtnFingerprint;
-    }
+  String _getPasskeyButtonText(AppLocalizations l10n) {
     return l10n.loginPasskeyBtn;
   }
 
@@ -428,7 +348,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     String? password,
   }) async {
     final sdk = ref.read(hubsightSdkProvider);
-    final hasStoredSession = sdk != null && await sdk.auth.isAuthenticated;
+    final hasStoredSession = sdk != null && await ensureUsableHubSightSession(sdk);
     if (!hasUsableLoginToken(result) || !hasStoredSession) {
       if (mounted) {
         setState(() {
@@ -1105,7 +1025,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     height: 48,
                                     child: ElevatedButton(
                                       onPressed:
-                                          (_isLoading || _isBiometricLoading)
+                                          (_isLoading || _isPasskeyLoading)
                                               ? null
                                               : _handleLogin,
                                       style: ElevatedButton.styleFrom(
@@ -1183,15 +1103,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                   const SizedBox(height: 16),
 
-                                  // Biometric / Passkey Login Button
+                                  // Native Passkey Login Button
                                   SizedBox(
                                     width: double.infinity,
                                     height: 48,
                                     child: OutlinedButton(
                                       onPressed:
-                                          (_isLoading || _isBiometricLoading)
+                                          (_isLoading || _isPasskeyLoading)
                                               ? null
-                                              : _handleBiometricLogin,
+                                              : _handlePasskeyLogin,
                                       style: OutlinedButton.styleFrom(
                                         backgroundColor:
                                             const Color(0xFF18181B),
@@ -1205,7 +1125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                               BorderRadius.circular(12),
                                         ),
                                       ),
-                                      child: _isBiometricLoading
+                                      child: _isPasskeyLoading
                                           ? const SizedBox(
                                               width: 20,
                                               height: 20,
@@ -1231,8 +1151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                                 const SizedBox(width: 8),
                                                 Flexible(
                                                   child: Text(
-                                                    _getBiometricButtonText(
-                                                        l10n),
+                                                    _getPasskeyButtonText(l10n),
                                                     overflow:
                                                         TextOverflow.ellipsis,
                                                     maxLines: 1,

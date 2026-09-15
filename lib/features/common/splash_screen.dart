@@ -76,7 +76,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         final sdk = ref.read(hubsightSdkProvider);
         hasImportedConfig = hasImportedHubSightConfig(sdk);
         if (sdk != null && hasImportedConfig) {
-          isAuthenticated = await sdk.auth.isAuthenticated;
+          isAuthenticated = await ensureUsableHubSightSession(sdk);
           if (isAuthenticated) {
             try {
               final profile = await sdk.auth.getProfile();

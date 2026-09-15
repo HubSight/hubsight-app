@@ -45,13 +45,39 @@ void main() {
       expect(hasUsableLoginToken(result), isFalse);
     });
 
-    test('accepts a successful response with a Bearer access token', () {
+    test('accepts a successful response with an opaque Bearer token', () {
       const result = AuthResult(
         isSuccess: true,
-        accessToken: 'jwt_access_token',
+        accessToken: 'opaque_access_token',
       );
 
       expect(hasUsableLoginToken(result), isTrue);
+    });
+
+    test('rejects a non-Bearer token type', () {
+      const result = AuthResult(
+        isSuccess: true,
+        accessToken: 'opaque_access_token',
+        tokenType: 'Basic',
+      );
+
+      expect(hasUsableLoginToken(result), isFalse);
+    });
+
+    test('accepts a non-expired JWT and rejects an expired JWT', () {
+      const activeResult = AuthResult(
+        isSuccess: true,
+        accessToken:
+            'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c3JfMDAxIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsInNlc3Npb25faWQiOiJzZXNzXzAwMSIsImV4cCI6MjUyNDYwODAwMH0.signature',
+      );
+      const expiredResult = AuthResult(
+        isSuccess: true,
+        accessToken:
+            'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c3JfMDAxIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsInNlc3Npb25faWQiOiJzZXNzXzAwMSIsImV4cCI6MTAwMDAwMDAwMH0.signature',
+      );
+
+      expect(hasUsableLoginToken(activeResult), isTrue);
+      expect(hasUsableLoginToken(expiredResult), isFalse);
     });
   });
 
@@ -97,7 +123,8 @@ void main() {
       expect(find.byIcon(Icons.fingerprint_rounded), findsOneWidget);
     });
 
-    testWidgets('empty password does not trigger login request', (tester) async {
+    testWidgets('empty password does not trigger login request',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -122,12 +149,13 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsNothing);
     });
 
-    testWidgets('tapping biometric button without credentials prompts guidance', (tester) async {
+    testWidgets('passkey login requires a username', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
-            biometricServiceProvider.overrideWithValue(MockBiometricService(prefs)),
+            biometricServiceProvider
+                .overrideWithValue(MockBiometricService(prefs)),
           ],
           child: const MaterialApp(
             localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -140,19 +168,22 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Find and tap the biometric button
-      final bioBtn = find.byType(OutlinedButton);
-      expect(bioBtn, findsOneWidget);
-      await tester.ensureVisible(bioBtn);
-      await tester.tap(bioBtn);
+      final passkeyButton = find.byType(OutlinedButton);
+      expect(passkeyButton, findsOneWidget);
+      await tester.ensureVisible(passkeyButton);
+      await tester.tap(passkeyButton);
       await tester.pumpAndSettle();
 
-      // Error banner indicates biometrics not supported on device
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
-      expect(find.text('Thiết bị không hỗ trợ hoặc chưa cài đặt sinh trắc học.'), findsOneWidget);
+      expect(
+        find.text('Nhập tên đăng nhập trước khi đăng nhập bằng Passkey.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('submitting username moves focus to password and submitting password triggers login', (tester) async {
+    testWidgets(
+        'submitting username moves focus to password and submitting password triggers login',
+        (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

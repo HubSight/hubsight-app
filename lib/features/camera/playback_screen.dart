@@ -9,9 +9,11 @@ import '../../core/network/sdk_provider.dart';
 import 'models/recognition_log.dart';
 import 'webrtc_viewer.dart';
 import 'ptz_bottom_sheet.dart';
-import 'onvif_discovery_sheet.dart';
 import '../common/main_tab_screen.dart';
 import '../../core/theme/app_theme.dart';
+
+@visibleForTesting
+bool supportsPtzControls(Camera? camera) => camera?.onvifPtzSupported == true;
 
 class PlaybackScreen extends ConsumerStatefulWidget {
   const PlaybackScreen({super.key});
@@ -74,8 +76,10 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   bool _isPtzExpanded = true;
   bool _showInlinePtz = false;
 
+  bool get _selectedCameraSupportsPtz => supportsPtzControls(_selectedCam);
+
   void _openPtzController() {
-    if (_selectedCam == null) return;
+    if (_selectedCam == null || !_selectedCameraSupportsPtz) return;
     HapticFeedback.lightImpact();
     PtzBottomSheet.show(context, camera: _selectedCam!).then((_) {
       _fetchPtzPresets();
@@ -84,7 +88,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
   Future<void> _fetchPtzPresets() async {
     final cam = _selectedCam;
-    if (cam == null || !cam.onvifPtzSupported) {
+    if (cam == null || !supportsPtzControls(cam)) {
       if (mounted) setState(() => _ptzPresets = []);
       return;
     }
@@ -344,22 +348,55 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
 
             if (_cameras.isNotEmpty && _selectedCam == null) {
               _selectedCam = _cameras.firstWhere((c) => !c.isStopped, orElse: () => _cameras.first);
-              _showInlinePtz = _selectedCam?.onvifPtzSupported == true || _selectedCam?.onvifEnabled == true;
+              _showInlinePtz = false;
             }
             _isLoadingCameras = false;
           });
 
           if (_selectedCam != null) {
+            _refreshSelectedCameraCapabilities(_selectedCam!.id);
             _fetchAvailableDays();
             _fetchTimeline();
             _fetchRecognitionLogs();
-            _fetchPtzPresets();
           }
         }
       }
     } catch (e) {
       debugPrint('Error fetching cameras: $e');
       if (mounted) setState(() => _isLoadingCameras = false);
+    }
+  }
+
+  Future<void> _refreshSelectedCameraCapabilities(String cameraId) async {
+    final sdk = ref.read(hubsightSdkProvider);
+    if (sdk == null) return;
+
+    try {
+      final detailedCamera = await sdk.cameras.getCamera(cameraId);
+      if (!mounted || _selectedCam?.id != cameraId) return;
+
+      setState(() {
+        final index = _cameras.indexWhere((camera) => camera.id == cameraId);
+        if (index >= 0) {
+          _cameras[index] = detailedCamera;
+        }
+        _selectedCam = detailedCamera;
+        if (!supportsPtzControls(detailedCamera)) {
+          _showInlinePtz = false;
+          _ptzPresets = [];
+        }
+      });
+
+      if (supportsPtzControls(detailedCamera)) {
+        await _fetchPtzPresets();
+      }
+    } catch (e) {
+      debugPrint('Error refreshing camera PTZ capability: $e');
+      if (mounted &&
+          _selectedCam?.id == cameraId &&
+          supportsPtzControls(_selectedCam)) {
+        await _fetchPtzPresets();
+      }
     }
   }
 
@@ -460,12 +497,12 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
       _mode = 'live';
       _activeRecording = null;
       _recordings = [];
-      _showInlinePtz = cam.onvifPtzSupported || cam.onvifEnabled;
+      _showInlinePtz = false;
     });
+    _refreshSelectedCameraCapabilities(cam.id);
     _fetchAvailableDays();
     _fetchTimeline();
     _fetchRecognitionLogs();
-    _fetchPtzPresets();
   }
 
   void _onSelectDate(DateTime date) {
@@ -677,7 +714,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
               _buildCameraQuickBar(l10n),
 
               // 3. Inline PTZ Controller Panel (Live PTZ)
-              if ((_selectedCam?.onvifPtzSupported == true) || (_selectedCam?.onvifEnabled == true) || _showInlinePtz)
+              if (_selectedCameraSupportsPtz && _showInlinePtz)
                 _buildInlinePtzSection(l10n),
 
               // 4. Unified Timeline & Playback Section
@@ -718,7 +755,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                       isFullscreen: isFullscreen,
                       onToggleFullscreen: _toggleFullscreen,
                       streamReloadIndex: _streamReloadIndex,
-                      hasPtz: (_selectedCam?.onvifPtzSupported ?? false) || (_selectedCam?.onvifEnabled ?? false) || _showInlinePtz,
+                      hasPtz: _selectedCameraSupportsPtz,
                       onOpenPtz: _openPtzController,
                     ),
                     // Top Video Info Bar (portrait only)
@@ -754,7 +791,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                                   letterSpacing: 0.3,
                                 ),
                               ),
-                              if ((_selectedCam?.onvifPtzSupported == true) || _showInlinePtz) ...[
+                              if (_selectedCameraSupportsPtz) ...[
                                 const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
@@ -779,7 +816,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                         ),
                       ),
                     // Top-right PTZ Controller Shortcut Button (portrait only)
-                    if (!isFullscreen && ((_selectedCam?.onvifPtzSupported == true) || _showInlinePtz))
+                    if (!isFullscreen && _selectedCameraSupportsPtz)
                       Positioned(
                         top: 10,
                         right: 12,
@@ -1156,7 +1193,7 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
         controller: _cameraScrollController,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         scrollDirection: Axis.horizontal,
-        itemCount: _cameras.length + 2,
+        itemCount: _cameras.length + 1 + (_selectedCameraSupportsPtz ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           if (index == _cameras.length) {
@@ -1193,8 +1230,8 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
             );
           }
 
-          if (index == _cameras.length + 1) {
-            final isPtzActive = (_selectedCam?.onvifPtzSupported == true) || _showInlinePtz;
+          if (index == _cameras.length + 1 && _selectedCameraSupportsPtz) {
+            final isPtzActive = _showInlinePtz;
             return InkWell(
               key: const Key('quick-ptz-toggle-chip'),
               onTap: () {
@@ -1310,7 +1347,9 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
   Widget _buildInlinePtzSection(AppLocalizations l10n) {
     final sdk = ref.watch(hubsightSdkProvider);
     final cam = _selectedCam;
-    if (cam == null) return const SizedBox.shrink();
+    if (cam == null || !supportsPtzControls(cam)) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1676,38 +1715,6 @@ class _PlaybackScreenState extends ConsumerState<PlaybackScreen> {
                           );
                         },
                       ),
-              ),
-              Divider(height: 1, color: context.borderAdaptive),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.radar_rounded, color: Color(0xFF10B981), size: 18),
-                ),
-                title: Text(
-                  l10n.onvifDiscovery,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: context.textPrimaryAdaptive,
-                  ),
-                ),
-                subtitle: Text(
-                  l10n.onvifDiscoverySubtitle,
-                  style: TextStyle(fontSize: 11, color: context.textMutedAdaptive),
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                onTap: () {
-                  Navigator.pop(context);
-                  OnvifDiscoverySheet.show(
-                    context,
-                    existingCameras: _cameras,
-                    initialCamera: _selectedCam,
-                  );
-                },
               ),
             ],
           ),

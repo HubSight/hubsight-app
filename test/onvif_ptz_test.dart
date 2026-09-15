@@ -8,7 +8,6 @@ import 'package:hubsight_sdk/hubsight_sdk.dart';
 import 'package:hubsight_app/core/services/biometric_service.dart';
 import 'package:hubsight_app/core/storage/storage_service.dart';
 import 'package:hubsight_app/features/camera/ptz_bottom_sheet.dart';
-import 'package:hubsight_app/features/camera/onvif_discovery_sheet.dart';
 import 'package:hubsight_app/features/camera/playback_screen.dart';
 import 'package:hubsight_app/features/camera/webrtc_viewer.dart';
 
@@ -37,6 +36,19 @@ void main() {
     streamName: 'front_ptz',
     onvifEnabled: true,
     onvifPtzSupported: true,
+  );
+
+  const testOnvifOnlyCam = Camera(
+    id: 'cam-onvif-1',
+    name: 'Fixed ONVIF Camera',
+    host: '192.168.1.51',
+    isActive: true,
+    isStopped: false,
+    enableAI: true,
+    thumbnailUrl: '',
+    streamName: 'fixed_onvif',
+    onvifEnabled: true,
+    onvifPtzSupported: false,
   );
 
   late SharedPreferences prefs;
@@ -106,61 +118,11 @@ void main() {
     });
   });
 
-  group('ONVIF Discovery Sheet Tests', () {
-    testWidgets('renders Discovery Form with Host, Port, and Probe button', (tester) async {
-      await tester.pumpWidget(
-        createWidgetForTesting(
-          const OnvifDiscoverySheet(
-            existingCameras: [testPtzCam],
-            initialCamera: testPtzCam,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Verify form elements
-      expect(find.text('Dò tìm thiết bị ONVIF'), findsOneWidget);
-      expect(find.byKey(const Key('start-onvif-probe-button')), findsOneWidget);
-      expect(find.text('Quét thiết bị'), findsOneWidget);
-    });
-
-    testWidgets('switches to custom IP mode and displays host input', (tester) async {
-      await tester.pumpWidget(
-        createWidgetForTesting(
-          const OnvifDiscoverySheet(
-            existingCameras: [testPtzCam],
-            initialCamera: testPtzCam,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Tap on custom IP chip
-      await tester.tap(find.text('Nhập IP tùy chỉnh'));
-      await tester.pumpAndSettle();
-
-      // Verify host text field is displayed
-      expect(find.text('Địa chỉ IP / Host'), findsOneWidget);
-    });
-  });
-
-  group('PlaybackScreen ONVIF Picker Integration Tests', () {
-    testWidgets('opens Camera Picker with ONVIF Discovery entry', (tester) async {
-      await tester.pumpWidget(
-        createWidgetForTesting(const PlaybackScreen()),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-
-      // Find and tap 'Tất cả' camera picker button
-      final allButton = find.text('Tất cả');
-      if (allButton.evaluate().isNotEmpty) {
-        await tester.tap(allButton);
-        await tester.pumpAndSettle();
-
-        // Verify ONVIF Discovery tile exists in the picker
-        expect(find.text('Dò tìm thiết bị ONVIF'), findsOneWidget);
-      }
+  group('PTZ capability gating', () {
+    test('enables controls only for cameras with confirmed PTZ support', () {
+      expect(supportsPtzControls(testPtzCam), isTrue);
+      expect(supportsPtzControls(testOnvifOnlyCam), isFalse);
+      expect(supportsPtzControls(null), isFalse);
     });
   });
 

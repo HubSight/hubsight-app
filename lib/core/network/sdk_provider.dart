@@ -142,6 +142,26 @@ bool hasImportedHubSightConfig(HubSightSDK? sdk) {
   return !isLegacyDefault;
 }
 
+/// Validates the stored SDK session and proactively refreshes expired JWTs.
+///
+/// Older deployments may still issue opaque access tokens. When claims cannot
+/// be decoded, the SDK's authenticated state and 401 interceptor remain the
+/// source of truth for backward compatibility.
+Future<bool> ensureUsableHubSightSession(HubSightSDK sdk) async {
+  if (!await sdk.auth.isAuthenticated) return false;
+
+  final claims = await sdk.auth.getClaims();
+  if (claims == null || !claims.isExpired) return true;
+
+  try {
+    if (!await sdk.auth.refreshToken()) return false;
+    final refreshedClaims = await sdk.auth.getClaims();
+    return refreshedClaims == null || !refreshedClaims.isExpired;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Central Riverpod provider exposing the [HubSightSDK] instance.
 final hubsightSdkProvider =
     StateNotifierProvider<SdkStateNotifier, HubSightSDK?>((ref) {

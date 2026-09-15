@@ -1121,8 +1121,14 @@ abstract class AppLocalizations {
   /// No description provided for @loginPasskeyBtn.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with Biometrics / Face ID'**
+  /// **'Sign in with Passkey'**
   String get loginPasskeyBtn;
+
+  /// No description provided for @loginPasskeyUsernameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your username before signing in with a Passkey.'**
+  String get loginPasskeyUsernameRequired;
 
   /// No description provided for @loginPasskeyBtnFaceId.
   ///

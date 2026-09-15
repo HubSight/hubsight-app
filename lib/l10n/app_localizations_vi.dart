@@ -582,7 +582,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get loginOrDivider => 'HOẶC';
 
   @override
-  String get loginPasskeyBtn => 'Đăng nhập bằng Vân tay / Face ID';
+  String get loginPasskeyBtn => 'Đăng nhập bằng Passkey';
+
+  @override
+  String get loginPasskeyUsernameRequired =>
+      'Nhập tên đăng nhập trước khi đăng nhập bằng Passkey.';
 
   @override
   String get loginPasskeyBtnFaceId => 'Đăng nhập bằng Face ID';

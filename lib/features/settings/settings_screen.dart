@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -11,11 +9,11 @@ import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/services/fcm_service.dart';
+import '../../core/services/passkey_service.dart';
 import '../auth/app_lock_screen.dart';
 import '../auth/change_password_dialog.dart';
 import '../auth/login_screen.dart';
 import '../config/server_config_screen.dart';
-import '../camera/onvif_discovery_sheet.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_provider.dart';
@@ -195,51 +193,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (name == null || name.isEmpty) return;
 
-    // Verify biometric on device
-    final canCheck = await bio.canAuthenticateWithBiometrics();
-    if (canCheck) {
-      final ok = await bio.authenticate(localizedReason: l10n.loginBiometricPrompt);
-      if (!ok) return;
-    }
-
     try {
       final sdk = ref.read(hubsightSdkProvider);
-      if (sdk != null) {
-        final options = await sdk.auth.getPasskeyRegisterOptions();
-        final challengeId = options['challenge_id']?.toString() ??
-            options['challenge']?.toString() ??
-            'bio_challenge_${DateTime.now().millisecondsSinceEpoch}';
+      if (sdk == null) return;
 
-        final credentialPayload = jsonEncode({
-          'type': 'mobile_biometric',
-          'platform': defaultTargetPlatform.name,
-          'device_label': name,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
+      final response = await sdk.auth.getPasskeyRegisterOptions();
+      final options = HubSightPasskeyOptions.fromResponse(response);
+      final credential =
+          await ref.read(passkeyServiceProvider).register(options.publicKey);
 
-        await sdk.auth.verifyPasskeyRegister(
-          challengeId: challengeId,
-          credential: credentialPayload,
-          name: name,
+      await sdk.auth.verifyPasskeyRegister(
+        challengeId: options.challengeId,
+        credential: credential,
+        name: name,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.passkeyAdded),
+            backgroundColor: const Color(0xFF10B981),
+          ),
         );
-
-        await bio.setBiometricEnabled(true);
-        if (_profile?.username != null && _profile!.username.isNotEmpty) {
-          await bio.saveLastUsername(_profile!.username);
-        }
-
-        if (mounted) {
-          setState(() {
-            _biometricUnlock = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.passkeyAdded),
-              backgroundColor: const Color(0xFF10B981),
-            ),
-          );
-          _fetchPasskeys();
-        }
+        _fetchPasskeys();
       }
     } catch (e) {
       if (mounted) {
@@ -653,12 +629,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildPushSettingsSection(l10n),
             const SizedBox(height: 14),
 
-            // 8. ONVIF Device Discovery
-            _buildSectionHeader(l10n.onvifDiscovery),
-            _buildOnvifSection(sdk, l10n),
-            const SizedBox(height: 14),
-
-            // 9. Server & Container Config
+            // 8. Server & Container Config
             _buildSectionHeader(l10n.serverConfigTitle),
             _buildServerInfoSection(sdk, l10n),
             const SizedBox(height: 22),
@@ -1574,32 +1545,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // --- 8. ONVIF Device Discovery Section ---
-  Widget _buildOnvifSection(HubSightSDK? sdk, AppLocalizations l10n) {
-    return _buildGroupCard(
-      children: [
-        _buildSettingTile(
-          icon: _buildSettingIcon(Icons.radar_rounded, const Color(0xFF10B981)),
-          title: l10n.onvifDiscovery,
-          subtitle: l10n.onvifDiscoverySubtitle,
-          trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
-          onTap: () async {
-            List<Camera> cameras = [];
-            if (sdk != null) {
-              try {
-                cameras = await sdk.cameras.listCameras();
-              } catch (_) {}
-            }
-            if (mounted) {
-              OnvifDiscoverySheet.show(context, existingCameras: cameras);
-            }
-          },
-        ),
-      ],
-    );
-  }
-
-  // --- 10. Safe Logout Action Section ---
+  // --- 9. Safe Logout Action Section ---
   Widget _buildLogoutSection(AppLocalizations l10n) {
     return Column(
       children: [
