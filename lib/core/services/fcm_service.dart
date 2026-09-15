@@ -158,6 +158,7 @@ class FcmService {
   bool _isInitialized = false;
   bool _registrationSuspended = false;
   bool _didReadLaunchDetails = false;
+  bool _localNotificationsReady = false;
   bool _isDisposed = false;
 
   Stream<PushNotificationPayload> get onPushReceived =>
@@ -183,6 +184,18 @@ class FcmService {
 
   Future<bool> _initialize({required bool requestPermission}) async {
     if (_isDisposed || !Platform.isAndroid) return false;
+
+    try {
+      if (!_localNotificationsReady) {
+        await _initializeLocalNotifications(_localNotifications);
+        await _createAndroidChannel();
+        _localNotificationsReady = true;
+      }
+      if (requestPermission) await _requestNotificationPermission();
+    } catch (error) {
+      debugPrint('Android notification setup failed: $error');
+      return false;
+    }
 
     final sdk = _ref.read(hubsightSdkProvider);
     final googleServicesJson = sdk?.config.googleServicesJson;
@@ -217,15 +230,12 @@ class FcmService {
         storedAndroidFirebaseOptionsKey,
         identity,
       );
-      await _initializeLocalNotifications(_localNotifications);
-      await _createAndroidChannel();
 
       _localResponseSubscription =
           _localNotificationResponseController.stream.listen(
         _handleEncodedNotificationTap,
       );
 
-      if (requestPermission) await _requestNotificationPermission();
       _registrationSuspended = false;
 
       final messaging = FirebaseMessaging.instance;
@@ -290,18 +300,11 @@ class FcmService {
   }
 
   Future<void> _requestNotificationPermission() async {
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
-    debugPrint(
-      'Notification permission status: ${settings.authorizationStatus}.',
-    );
+    final granted = await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+    debugPrint('Android notification permission granted: $granted.');
   }
 
   Future<void> _createAndroidChannel() async {
