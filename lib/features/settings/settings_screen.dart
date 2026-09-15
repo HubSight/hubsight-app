@@ -496,13 +496,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final sdk = ref.read(hubsightSdkProvider);
     final fcm = ref.read(fcmServiceProvider);
 
+    await fcm.unregisterTokenForLogout();
     if (sdk != null) {
-      final token = fcm.fcmToken;
-      if (token != null) {
-        try {
-          await sdk.fcm.unregisterPushToken(token);
-        } catch (_) {}
-      }
       await sdk.auth.logout();
     }
 

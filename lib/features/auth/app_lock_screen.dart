@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import 'login_screen.dart';
@@ -212,6 +213,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> with SingleTicker
 
   void _handleLogout() async {
     final sdk = ref.read(hubsightSdkProvider);
+    await ref.read(fcmServiceProvider).unregisterTokenForLogout();
     if (sdk != null) {
       await sdk.auth.logout();
     }

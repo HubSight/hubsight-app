@@ -27,7 +27,7 @@ class MockFcmService extends FcmService {
   MockFcmService({required super.ref});
 
   @override
-  Future<void> initialize() async {}
+  Future<bool> initialize({bool requestPermission = true}) async => true;
 }
 
 void main() {

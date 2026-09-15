@@ -10,6 +10,8 @@ import 'package:hubsight_sdk/hubsight_sdk.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/localization/error_localizer.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../core/services/firebase_config_parser.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../auth/login_screen.dart';
 
@@ -409,11 +411,20 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     });
 
     try {
+      final googleServicesJson = _decryptedConfig!.googleServicesJson;
+      if (googleServicesJson != null && googleServicesJson.trim().isNotEmpty) {
+        parseAndroidFirebaseOptions(googleServicesJson);
+      }
+
       // Clear credentials tied to the previous server before activating the new profile.
-      await ref.read(hubsightSdkProvider)?.auth.logout();
+      final currentSdk = ref.read(hubsightSdkProvider);
+      final fcm = ref.read(fcmServiceProvider);
+      await fcm.prepareForConfigSwitch();
+      await currentSdk?.auth.logout();
 
       // Initialize SDK and persist only after explicit user confirmation.
       await ref.read(hubsightSdkProvider.notifier).initializeFromConfig(_decryptedConfig!);
+      await fcm.initialize();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

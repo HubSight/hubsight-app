@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +11,13 @@ import '../../core/theme/app_theme.dart';
 import '../common/main_tab_screen.dart';
 import '../config/server_config_screen.dart';
 import 'change_password_dialog.dart';
+
+@visibleForTesting
+bool hasUsableLoginToken(AuthResult result) {
+  return result.isSuccess &&
+      result.accessToken != null &&
+      result.accessToken!.trim().isNotEmpty;
+}
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -264,7 +269,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    // 2. Check if biometric credentials, active session, or username for passkey exist
+    // 2. Biometric sign-in requires saved credentials or an active session.
     final hasCreds = await bio.hasBiometricCredentials();
     var sdk = ref.read(hubsightSdkProvider);
     if (sdk == null) {
@@ -273,9 +278,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     final isAuthed = sdk != null ? await sdk.auth.isAuthenticated : false;
-    final lastUsername = bio.getLastUsername() ?? _usernameController.text.trim();
 
-    if (!hasCreds && !isAuthed && lastUsername.isEmpty) {
+    if (!hasCreds && !isAuthed) {
       if (mounted) {
         _showBiometricSetupNoticeDialog(l10n);
       }
@@ -292,47 +296,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    // 4. Perform login with Passkey (Passwordless) or saved credentials
+    // 4. Use biometrics to unlock credentials saved in Keychain/Keystore,
+    // then use the standard app login endpoint to obtain Bearer tokens.
     setState(() => _isBiometricLoading = true);
     try {
-      // 4A. Try Passwordless Passkey Login with server
-      if (sdk != null && lastUsername.isNotEmpty) {
-        try {
-          final options = await sdk.auth.getPasskeyLoginOptions(lastUsername);
-          final challengeId = options['challenge_id']?.toString() ??
-              options['challenge']?.toString() ??
-              '';
-          if (challengeId.isNotEmpty) {
-            final result = await sdk.auth.verifyPasskeyLogin(
-              challengeId: challengeId,
-              credential: jsonEncode({
-                'type': 'mobile_biometric',
-                'username': lastUsername,
-                'platform': defaultTargetPlatform.name,
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
-              }),
-            );
-            if (result.requires2FA) {
-              if (mounted) {
-                setState(() {
-                  _preAuthToken = result.preAuthToken;
-                  _showTwoFactorModal = true;
-                  _isBiometricLoading = false;
-                });
-              }
-              return;
-            }
-            if (result.isSuccess) {
-              await _onLoginSuccess(result, username: lastUsername);
-              return;
-            }
-          }
-        } catch (passkeyErr) {
-          debugPrint('Passkey passwordless login notice: $passkeyErr');
-        }
-      }
-
-      // 4B. Try saved biometric credentials (Keychain)
       if (hasCreds) {
         final creds = await bio.getBiometricCredentials();
         if (creds != null && sdk != null) {
@@ -351,13 +318,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             return;
           }
           if (result.isSuccess) {
-            await _onLoginSuccess(result);
+            await _onLoginSuccess(
+              result,
+              username: creds['username']!,
+              password: creds['password']!,
+            );
             return;
           }
         }
       }
 
-      // 4C. If active session token exists, verify profile or refresh
+      // If an active session token exists, verify profile or refresh.
       if (sdk != null && await sdk.auth.isAuthenticated) {
         try {
           await sdk.auth.getProfile();
@@ -458,6 +429,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     String? username,
     String? password,
   }) async {
+    final sdk = ref.read(hubsightSdkProvider);
+    final hasStoredSession = sdk != null && await sdk.auth.isAuthenticated;
+    if (!hasUsableLoginToken(result) || !hasStoredSession) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = AppLocalizations.of(context)!.errSessionExpired;
+        });
+      }
+      return;
+    }
+
     final bio = ref.read(biometricServiceProvider);
     if (username != null && username.isNotEmpty) {
       await bio.saveLastUsername(username);
@@ -551,19 +533,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     // 3. Register FCM Device Token
-    final fcm = ref.read(fcmServiceProvider);
-    final token = fcm.fcmToken;
-    final sdk = ref.read(hubsightSdkProvider);
-    if (token != null && sdk != null) {
-      try {
-        await sdk.fcm.registerPushToken(token);
-      } catch (e) {
-        debugPrint('FCM register token notice: $e');
-      }
-    }
+    await ref.read(fcmServiceProvider).syncTokenWithBackend();
 
     // 4. Connect Realtime Relay
-    sdk?.relay.connect();
+    sdk.relay.connect();
 
     // 5. Navigate
     if (mounted) {

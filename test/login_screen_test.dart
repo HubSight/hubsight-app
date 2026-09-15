@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hubsight_app/core/services/biometric_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hubsight_sdk/hubsight_sdk.dart';
 
 class MockBiometricService extends BiometricService {
   MockBiometricService(super.prefs);
@@ -29,6 +30,29 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
+  });
+
+  group('Login session validation', () {
+    test('rejects a successful response without an access token', () {
+      const result = AuthResult(isSuccess: true);
+
+      expect(hasUsableLoginToken(result), isFalse);
+    });
+
+    test('rejects an empty access token', () {
+      const result = AuthResult(isSuccess: true, accessToken: '   ');
+
+      expect(hasUsableLoginToken(result), isFalse);
+    });
+
+    test('accepts a successful response with a Bearer access token', () {
+      const result = AuthResult(
+        isSuccess: true,
+        accessToken: 'jwt_access_token',
+      );
+
+      expect(hasUsableLoginToken(result), isTrue);
+    });
   });
 
   group('LoginScreen Widget Tests', () {

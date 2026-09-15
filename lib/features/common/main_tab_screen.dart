@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/sdk_provider.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../camera/playback_screen.dart';
@@ -34,6 +35,9 @@ class MainTabScreen extends ConsumerStatefulWidget {
 
 class _MainTabScreenState extends ConsumerState<MainTabScreen> {
   StreamSubscription? _alertSub;
+  StreamSubscription<PushNotificationPayload>? _pushSub;
+  StreamSubscription<PushNotificationPayload>? _notificationTapSub;
+  final Set<String> _countedPushIds = <String>{};
 
   @override
   void initState() {
@@ -45,6 +49,7 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
     }
 
     _initNotificationBadge();
+    _initPushNotificationRouting();
   }
 
   @override
@@ -78,9 +83,36 @@ class _MainTabScreenState extends ConsumerState<MainTabScreen> {
     }
   }
 
+  void _initPushNotificationRouting() {
+    final fcm = ref.read(fcmServiceProvider);
+    _pushSub = fcm.onPushReceived.listen((payload) {
+      if (!mounted) return;
+      final id = payload.id;
+      if (id != null && !_countedPushIds.add(id)) return;
+      ref.read(unreadNotificationCountProvider.notifier).update((count) => count + 1);
+    });
+    _notificationTapSub = fcm.onNotificationTapped.listen((_) {
+      fcm.takePendingNotificationTap();
+      _openNotificationsTab();
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (fcm.takePendingNotificationTap() != null) {
+        _openNotificationsTab();
+      }
+    });
+  }
+
+  void _openNotificationsTab() {
+    if (!mounted) return;
+    ref.read(mainTabIndexProvider.notifier).state = 2;
+  }
+
   @override
   void dispose() {
     _alertSub?.cancel();
+    _pushSub?.cancel();
+    _notificationTapSub?.cancel();
     super.dispose();
   }
 

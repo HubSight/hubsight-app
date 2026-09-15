@@ -65,14 +65,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _initializeApp() async {
     final startTime = DateTime.now();
 
-    // 1. Initialize FCM Push Notifications
-    try {
-      ref.read(fcmServiceProvider).initialize();
-    } catch (e) {
-      debugPrint('FCM initialization error: $e');
-    }
-
-    // 2. Restore or initialize SDK session
+    // 1. Restore or initialize the SDK so runtime Firebase config is available.
     bool isAuthenticated = false;
     try {
       final sdkNotifier = ref.read(hubsightSdkProvider.notifier);
@@ -118,6 +111,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
     } catch (e) {
       debugPrint('SDK session initialization error: $e');
+    }
+
+    // 2. Initialize FCM from google-services.json embedded in the active config.
+    try {
+      await ref.read(fcmServiceProvider).initialize();
+    } catch (e) {
+      debugPrint('FCM initialization error: $e');
     }
 
     // 3. Guarantee minimal smooth display duration

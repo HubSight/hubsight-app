@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hubsight_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/network/sdk_provider.dart';
 import 'core/services/biometric_service.dart';
+import 'core/services/fcm_service.dart';
 import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -15,6 +18,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerFcmBackgroundHandler();
 
   // Initialize local preferences
   final prefs = await SharedPreferences.getInstance();
@@ -60,6 +64,12 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
     if (state == AppLifecycleState.paused) {
       bio.recordBackgroundTime();
     } else if (state == AppLifecycleState.resumed) {
+      final fcm = ref.read(fcmServiceProvider);
+      if (fcm.isInitialized) {
+        unawaited(fcm.syncTokenWithBackend());
+      } else {
+        unawaited(fcm.initialize(requestPermission: false));
+      }
       _checkAppLock();
     }
   }
@@ -106,6 +116,12 @@ class _HubSightAppState extends ConsumerState<HubSightApp>
     final maintenanceEx = ref.watch(maintenanceStateProvider);
     final appLocale = ref.watch(appLocaleProvider);
     final themeMode = ref.watch(appThemeModeProvider);
+
+    ref.listen<bool>(remoteRevocationEventProvider, (previous, revoked) {
+      if (revoked) {
+        unawaited(ref.read(fcmServiceProvider).unregisterTokenForLogout());
+      }
+    });
 
     return MaterialApp(
       navigatorKey: rootNavigatorKey,

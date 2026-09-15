@@ -27,6 +27,7 @@ dependencies:
   # Firebase (Push Notifications)
   firebase_core: ^3.0.0
   firebase_messaging: ^15.0.0
+  flutter_local_notifications: ^22.3.1
 
   # Local Storage & Security
   shared_preferences: ^2.2.2
