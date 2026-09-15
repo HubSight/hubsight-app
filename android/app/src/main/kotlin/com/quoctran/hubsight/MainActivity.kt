@@ -1,4 +1,4 @@
-package com.hubsight.hubsight_app
+package com.quoctran.hubsight
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
